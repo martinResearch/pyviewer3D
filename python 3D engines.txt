@@ -1,0 +1,15 @@
+intallation et test python ogre
+
+
+the examples do not run because there is OgreCore.zip missing
+
+this file can be found here:
+
+http://ogre.svn.sourceforge.net/viewvc/ogre/branches/v1-6/Samples/Media/
+
+
+
+PyQt with python ogre:
+http://www.ogre3d.org/addonforums/viewtopic.php?f=3&t=6791
+
+http://irmatden.developpez.com/tutoriels/qt/integration-ogre-qt/
