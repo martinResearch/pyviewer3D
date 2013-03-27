@@ -27,9 +27,11 @@ class MeshWidget(PyGLWidget):
         PyGLWidget.__init__(self, parent)
         self.col=[]
         self.points= []
+        self.pointsColors=[]
 
-    def plotPoints(self,points):
+    def plotPoints(self,points,vertexColors=[]):
         self.points=numpy.array(points,dtype=numpy.float32)
+        self.pointsColors=numpy.array(vertexColors,dtype=numpy.float32)
         self.scale=1
         #self.faces=numpy.array([[1,2,3],[3,4,5]],dtype=numpy.int32)
         # create a Vertex Buffer Object with the specified data
@@ -53,12 +55,15 @@ class MeshWidget(PyGLWidget):
             glColor( 0.95, 0.207, 0.031 )
             glPointSize( 6.0 )
             glEnable( GL_POINT_SMOOTH )
-            
+            glEnableClientState(GL_COLOR_ARRAY)
+                  
             glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
             glVertexPointerf( self.points*self.scale)
+            glColorPointerf(self.pointsColors)     
             #self.vbo.bind() # bind the VBO 
             #glVertexPointer(3, GL_FLOAT, 0, self.vbo) # these vertices contain 3 single precision coordinates
             glDrawArrays(GL_POINTS, 0, self.points.shape[0])   # draw "count" points from the VBO
+          
             #glDrawElementsui(GL_POINTS,self.points*self.scale)
             #glDrawElementsui(GL_TRIANGLES,self.faces)
 
@@ -117,9 +122,12 @@ class Example(QtGui.QMainWindow):
         r=inputModule.reader(file)
         
         vertices=[]
+        vertexColors=[]
         for t in r.readNode():
-            vertices.append([t.x,t.y,t.z])
-        self.glWidget.plotPoints(vertices)    
+            vertices.append([float(t.x),float(t.y),float(t.z)])
+            vertexColors.append([float(x)/255 for x in t.color])
+            
+        self.glWidget.plotPoints(vertices,vertexColors=vertexColors)    
         # creat numpy arrays
         # vertices
         # normals

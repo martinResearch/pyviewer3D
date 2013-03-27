@@ -55,7 +55,7 @@ class reader(generic.reader):
 			line = self.getline()
 			coord = line.split()
 			self.counterNodes += 1
-			yield generic.node(coord[0], coord[1], coord[2], label=str(self.counterNodes))
+			yield generic.node(coord[0], coord[1], coord[2], label=str(self.counterNodes),color=coord[3:6])
 
 	def readElementIndexed(self):
 		"Gets next element"
