@@ -13,3 +13,7 @@ PyQt with python ogre:
 http://www.ogre3d.org/addonforums/viewtopic.php?f=3&t=6791
 
 http://irmatden.developpez.com/tutoriels/qt/integration-ogre-qt/
+
+
+load ply file : 
+maybe could use http://cgkit.sourceforge.net/doc2/index.html#
