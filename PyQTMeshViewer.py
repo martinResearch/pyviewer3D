@@ -21,6 +21,42 @@ import numpy
 import OpenGL.arrays.vbo as glvbo
 
 
+
+class ColladaWidget(PyGLWidget):
+
+    def __init__(self, parent):
+        PyGLWidget.__init__(self, parent)
+        self.col=[]
+
+    def loadCollada(self,fname):
+        self.col = collada.Collada(fname, ignore=[collada.DaeUnsupportedError,
+                                            collada.DaeBrokenRefError])
+
+
+    def paintGL(self):
+        PyGLWidget.paintGL(self)
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glShadeModel(GL_SMOOTH)
+        glEnable(GL_LIGHT0)
+        glEnable(GL_LIGHTING)
+        scale=0.01
+
+        if self.col:
+            if self.col.scene is not None:
+                for geom in self.col.scene.objects('geometry'):
+                    for prim in geom.primitives():
+                        prim.generateNormals() # regenerate normals to make sure there is only one normal per vertex (glDrawElementsui can take only on array of indices), this assume the surface to be smooth
+
+                        glEnableClientState(GL_NORMAL_ARRAY)
+                        glNormalPointerf( prim.normal)#http://www.opengl.org/discussion_boards/ubbthreads.php?ubb=showflat&Number=264532
+                        glEnableClientState(GL_VERTEX_ARRAY)
+                        glVertexPointerf( prim.vertex*scale)
+
+                        glDrawElementsui(GL_TRIANGLES,prim.vertex_index)
+        glFlush()
+
+
 class MeshWidget(PyGLWidget):
 
     def __init__(self, parent):
@@ -28,6 +64,7 @@ class MeshWidget(PyGLWidget):
         self.col=[]
         self.points= []
         self.pointsColors=[]
+        self.faces=[]
 
     def plotPoints(self,points,vertexColors=[]):
         self.points=numpy.array(points,dtype=numpy.float32)
@@ -42,8 +79,9 @@ class MeshWidget(PyGLWidget):
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glShadeModel(GL_SMOOTH)
-        #glEnable(GL_LIGHT0)
-        #glEnable(GL_LIGHTING)
+        if len(self.faces)>0:
+            glEnable(GL_LIGHT0)
+            glEnable(GL_LIGHTING)
         
 
        
@@ -51,46 +89,49 @@ class MeshWidget(PyGLWidget):
         #glNormalPointerf( prim.normal)#http://www.opengl.org/discussion_boards/ubbthreads.php?ubb=showflat&Number=264532
       
         if len(self.points)>0:
-                         
-            glColor( 0.95, 0.207, 0.031 )
-            glPointSize( 6.0 )
-            glEnable( GL_POINT_SMOOTH )
-            glEnableClientState(GL_COLOR_ARRAY)
-                  
-            glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
-            glVertexPointerf( self.points*self.scale)
-            glColorPointerf(self.pointsColors)     
-            #self.vbo.bind() # bind the VBO 
-            #glVertexPointer(3, GL_FLOAT, 0, self.vbo) # these vertices contain 3 single precision coordinates
-            glDrawArrays(GL_POINTS, 0, self.points.shape[0])   # draw "count" points from the VBO
-          
-            #glDrawElementsui(GL_POINTS,self.points*self.scale)
-            #glDrawElementsui(GL_TRIANGLES,self.faces)
-
-##                        glBegin(GL_TRIANGLES)                 # Start drawing a polygon
-##                        for tri  in prim.triangles():
-##
-##
-##                            glNormal3f(tri.normals[0,0],tri.normals[0,1],tri.normals[0,2])
-##                            glVertex3f(tri.vertices[0,0]*scale,tri.vertices[0,1]*scale,tri.vertices[0,2]*scale)
-##
-##                            glNormal3f(tri.normals[1,0],tri.normals[1,1],tri.normals[1,2])
-##                            glVertex3f(tri.vertices[1,0]*scale,tri.vertices[1,1]*scale,tri.vertices[1,2]*scale)
-##
-##                            glNormal3f(tri.normals[2,0],tri.normals[2,1],tri.normals[2,2])
-##                            glVertex3f(tri.vertices[2,0]*scale,tri.vertices[2,1]*scale,tri.vertices[2,2]*scale)
-##
-##                        glEnd()
+            if len(self.faces)>0:  
+                #draw a triangulated mesh
+                glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
+                glVertexPointerf( self.points*self.scale)
+                glColorPointerf(self.pointsColors)   
+                glDrawElementsui(GL_TRIANGLES,self.faces)
+            else: 
+                # draw point cloud
+                glColor( 0.95, 0.207, 0.031 )
+                glPointSize( 6.0 )
+                glEnable( GL_POINT_SMOOTH )
+                glEnableClientState(GL_COLOR_ARRAY)                  
+                glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
+                glVertexPointerf( self.points*self.scale)
+                glColorPointerf(self.pointsColors)     
+                #self.vbo.bind() # bind the VBO 
+                #glVertexPointer(3, GL_FLOAT, 0, self.vbo) # these vertices contain 3 single precision coordinates
+                glDrawArrays(GL_POINTS, 0, self.points.shape[0])   # draw "count" points from the VBO
+              
         glFlush()
+        
+    def openMesh(self,fname):
+        inputFormat=meshconvert.getFormat(fname,"garbage")
+        inputModule =  __import__("meshconvert."+inputFormat, globals(),  locals(), [""])
+        file =open(fname ,'r')
+        r=inputModule.reader(file)
+        
+        vertices=[]
+        vertexColors=[]
+        for t in r.readNode():
+            vertices.append([float(t.x),float(t.y),float(t.z)])
+            vertexColors.append([float(x)/255 for x in t.color])
+            
+        self.plotPoints(vertices,vertexColors=vertexColors)          
 
 
 
 
 
-class Example(QtGui.QMainWindow):
+class SimpleMeshViewerUI(QtGui.QMainWindow):
 
     def __init__(self):
-        super(Example, self).__init__()
+        super(SimpleMeshViewerUI, self).__init__()
 
         self.initUI()
 
@@ -115,25 +156,8 @@ class Example(QtGui.QMainWindow):
 
     def showDialog(self):
 
-        fname = str(QtGui.QFileDialog.getOpenFileName(self, 'Open file',       os.getcwd()))
-        inputFormat=meshconvert.getFormat(fname,"garbage")
-        inputModule =  __import__("meshconvert."+inputFormat, globals(),  locals(), [""])
-        file =open(fname ,'r')
-        r=inputModule.reader(file)
-        
-        vertices=[]
-        vertexColors=[]
-        for t in r.readNode():
-            vertices.append([float(t.x),float(t.y),float(t.z)])
-            vertexColors.append([float(x)/255 for x in t.color])
-            
-        self.glWidget.plotPoints(vertices,vertexColors=vertexColors)    
-        # creat numpy arrays
-        # vertices
-        # normals
-        # faces
-        
-        #self.glWidget.loadCollada(fname)
+        fname = str(QtGui.QFileDialog.getOpenFileName(self, 'Open file',       os.getcwd()))             
+        self.glWidget.openMesh(fname)
 
 
 
@@ -141,7 +165,7 @@ class Example(QtGui.QMainWindow):
 def main():
 
     app = QtGui.QApplication(sys.argv)
-    ex = Example()
+    ex = SimpleMeshViewerUI()
     sys.exit(app.exec_())
 
 

@@ -33,13 +33,14 @@ class reader(object):
 		self.lineno = 0
 
 class node(object):
-	def __init__(self, x, y, z, label='1', color='0'):
+	def __init__(self, x, y, z, label='1', color='0',normal=[]):
 		"Mesh node"
 		self.x = x
 		self.y = y
 		self.z = z
 		self.label = label
 		self.color = color
+		self.normal=normal
 		if logger.isEnabledFor(logging.DEBUG):
 			logger.debug("found node label=%s (%s,%s,%s) color=%s" % (self.label, self.x, self.y, self.z, self.color))
 

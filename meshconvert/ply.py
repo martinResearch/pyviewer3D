@@ -31,12 +31,24 @@ class reader(generic.reader):
 		line = self.getline()
 		assert line == "property float z"
 		line = self.getline()
-		fields = line.split()
-		assert fields[0] == "element" and fields[1] == "face"
-		self.nrElements = int(fields[2])
+		assert line == "property float nx"
 		line = self.getline()
-		assert line == "property list uchar int vertex_indices"
+	        assert line == "property float ny"		
 		line = self.getline()
+		assert line == "property float nz"		
+		line = self.getline()
+		assert line == "property uchar diffuse_red"
+		line = self.getline()
+		assert line == "property uchar diffuse_green"		
+		line = self.getline()
+		assert line == "property uchar diffuse_blue"	
+		line = self.getline()
+		#fields = line.split()
+		#assert fields[0] == "element" and fields[1] == "face"
+		#self.nrElements = int(fields[2])
+		#line = self.getline()
+		#assert line == "property list uchar int vertex_indices"
+		#line = self.getline()
 		assert line == "end_header"
 		self.counterNodes = 0
 		self.counterElements = 0
@@ -55,7 +67,7 @@ class reader(generic.reader):
 			line = self.getline()
 			coord = line.split()
 			self.counterNodes += 1
-			yield generic.node(coord[0], coord[1], coord[2], label=str(self.counterNodes),color=coord[3:6])
+			yield generic.node(coord[0], coord[1], coord[2], label=str(self.counterNodes),normal=coord[3:6],color=coord[6:9])
 
 	def readElementIndexed(self):
 		"Gets next element"
