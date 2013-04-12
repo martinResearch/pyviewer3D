@@ -20,7 +20,14 @@ import os
 import numpy
 import OpenGL.arrays.vbo as glvbo
 
-
+def normalize_v3(arr):
+    # from https://sites.google.com/site/dlampetest/python/calculating-normals-of-a-triangle-mesh-using-numpy
+    ''' Normalize a numpy array of 3 component vectors shape=(n,3) '''
+    lens = numpy.sqrt( arr[:,0]**2 + arr[:,1]**2 + arr[:,2]**2 )
+    arr[:,0] /= lens
+    arr[:,1] /= lens
+    arr[:,2] /= lens                
+    return arr
 
 class ColladaWidget(PyGLWidget):
 
@@ -66,14 +73,19 @@ class MeshWidget(PyGLWidget):
         self.pointsColors=[]
         self.faces=[]
 
-    def plotPoints(self,points,vertexColors=[]):
+    def plotPoints(self,points,vertexColors=[],faces=[],normals=[]):
         self.points=numpy.array(points,dtype=numpy.float32)
         self.pointsColors=numpy.array(vertexColors,dtype=numpy.float32)
+        self.faces=numpy.array(faces,dtype=numpy.uint32)
+        self.normals=normals
         self.scale=1
         #self.faces=numpy.array([[1,2,3],[3,4,5]],dtype=numpy.int32)
         # create a Vertex Buffer Object with the specified data
-        self.vbo = glvbo.VBO(self.points)    # from # http://cyrille.rossant.net/blog/page/3/    
+        self.vbo = glvbo.VBO(self.points)    # from # http://cyrille.rossant.net/blog/page/3/   
         
+
+              
+            
     def paintGL(self):
         PyGLWidget.paintGL(self)
 
@@ -91,9 +103,12 @@ class MeshWidget(PyGLWidget):
         if len(self.points)>0:
             if len(self.faces)>0:  
                 #draw a triangulated mesh
+                glEnableClientState(GL_NORMAL_ARRAY)
+                glNormalPointerf( self.normals)
                 glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
                 glVertexPointerf( self.points*self.scale)
                 glColorPointerf(self.pointsColors)   
+              
                 glDrawElementsui(GL_TRIANGLES,self.faces)
             else: 
                 # draw point cloud
@@ -121,8 +136,32 @@ class MeshWidget(PyGLWidget):
         for t in r.readNode():
             vertices.append([float(t.x),float(t.y),float(t.z)])
             vertexColors.append([float(x)/255 for x in t.color])
-            
-        self.plotPoints(vertices,vertexColors=vertexColors)          
+        
+        faces=[]
+        for t in r.readElementIndexed():
+                faces.append([int(i) for i in t.list])
+        faces= numpy.array(faces,dtype=numpy.int32)   
+        vertices=numpy.array(vertices,dtype=numpy.float32)         
+        # from https://sites.google.com/site/dlampetest/python/calculating-normals-of-a-triangle-mesh-using-numpy       
+        #Create a zeroed array with the same type and shape as our vertices i.e., per vertex normal
+        norm = numpy.zeros( vertices.shape, dtype=vertices.dtype )
+        #Create an indexed view into the vertex array using the array of three indices for triangles
+        tris = vertices[faces]
+        #Calculate the normal for all the triangles, by taking the cross product of the vectors v1-v0, and v2-v0 in each triangle             
+        n = numpy.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )
+        # n is now an array of normals per triangle. The length of each normal is dependent the vertices, 
+        # we need to normalize these, so that our next step weights each normal equally.
+        normalize_v3(n)
+        # now we have a normalized array of normals, one per triangle, i.e., per triangle normals.
+        # But instead of one per triangle (i.e., flat shading), we add to each vertex in that triangle, 
+        # the triangles' normal. Multiple triangles would then contribute to every vertex, so we need to normalize again afterwards.
+        # The cool part, we can actually add the normals through an indexed view of our (zeroed) per vertex normal array
+        norm[ faces[:,0] ] += n
+        norm[ faces[:,1] ] += n
+        norm[ faces[:,2] ] += n
+        normalize_v3(norm)
+        self.plotPoints(vertices,vertexColors=vertexColors,faces=faces,normals=norm)    
+        
 
 
 

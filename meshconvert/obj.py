@@ -32,17 +32,29 @@ class reader(generic.reader):
 		"Gets next element"
 		self.f.seek(0)
 		elementCounter = 0
+		nodeCounter = 0
 		try:
 			while True:
 				line = self.getline()
 				while line.endswith("\\"):
 					# Remove backslash and concatenate with next line
 					line = line[:-1] + self.getline()
-				if line.startswith("f "):
+				if line.startswith("v "):
+					nodeCounter += 1	
+					
+				elif line.startswith("f "):
 					fields = line.split()
 					fields.pop(0)
-					elementCounter += 1
-					yield generic.indexedElement("Tri3", fields, label=str(elementCounter))
+					elementCounter += 1					
+					# in some obj faces are defined as -70//-70 -69//-69 -62//-62 
+					cleanedFields=[]
+					for f in fields: 
+						f=f.split('/')[0]
+						if f[0]=='-':
+							f=str(nodeCounter+int(f))
+						cleanedFields.append(f)
+					
+					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter))
 		except IOError:
 			return
 

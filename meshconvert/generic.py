@@ -33,7 +33,7 @@ class reader(object):
 		self.lineno = 0
 
 class node(object):
-	def __init__(self, x, y, z, label='1', color='0',normal=[]):
+	def __init__(self, x, y, z, label='1', color=['0.5','0.5','0.5'],normal=[]):
 		"Mesh node"
 		self.x = x
 		self.y = y
@@ -57,6 +57,7 @@ class indexedElement(object):
 		self.list = list
 		self.label = label
 		self.color = color
+		
 		if logger.isEnabledFor(logging.DEBUG):
 			logger.debug("found element label=%s (%s) color=%s" % (self.label, ",".join(self.list), self.color))
 
