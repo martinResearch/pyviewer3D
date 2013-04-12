@@ -99,10 +99,17 @@ class MeshWidget(PyGLWidget):
         self.pointsColors=[]
         self.faces=[]
 
-    def plotPoints(self,points,vertexColors=[],faces=[],normals=[]):
+    def plotPoints(self,points,vertexColors=[],faces=[],normals=[],faceColors=[]):
         self.points=numpy.array(points,dtype=numpy.float32)
         self.pointsColors=numpy.array(vertexColors,dtype=numpy.float32)
         self.faces=numpy.array(faces,dtype=numpy.uint32)
+        self.faceColors=[]
+        if len(faceColors)>0:
+            
+            #self.faceColors=numpy.array(faceColors,dtype=numpy.float32)            
+            self.pointsColors=numpy.zeros((self.points.shape[0],3),dtype=numpy.float32)            
+            for i in range(3):
+                self.pointsColors[self.faces[:,i],:]=faceColors # warning this assume that faces do not share vertices
         assert(max(self.faces.flatten())<self.points.shape[0])
         if faces!=[]: 
             if normals==[]:
@@ -136,6 +143,9 @@ class MeshWidget(PyGLWidget):
         if len(self.faces)>0:
             glEnable(GL_LIGHT0)
             glEnable(GL_LIGHTING)
+            if len(self.pointsColors)>0:
+                glColorMaterial ( GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE )
+                glEnable ( GL_COLOR_MATERIAL )            
         
 
        
@@ -145,20 +155,42 @@ class MeshWidget(PyGLWidget):
         if len(self.points)>0:
             if len(self.faces)>0:  
                 #draw a triangulated mesh
+                #glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
                 glEnableClientState(GL_NORMAL_ARRAY)
                 glNormalPointerf( self.normals)
+                if len(self.pointsColors)>0:
+                    glEnableClientState(GL_COLOR_ARRAY)                 
                 glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
                 glVertexPointerf( self.points*self.scale)
+                if len(self.pointsColors)>0:                    
+                    glColorPointerf(self.pointsColors)                       
+                if len(self.faceColors)>0:
+                    # I am strugling to display flat color triangles
+                    # http://stackoverflow.com/questions/6056679/gldrawelements-and-flat-shading
+                    #glShadeModel(GL_FLAT);
+                    #glEnableClientState(GL_COLOR_ARRAY)
+                    #glColorPointerf( self.faceColors)    
+                    #glGenBuffer(1,self.faceColors)
+                    #glBindBuffer(GL_ARRAY_BUFFER,self.faceColors);
+                    #tmp=numpy.array(range(self.faces.shape[0]))*numpy.ones((1,3))
+                    #glVertexAttribPointer(1, tmp)
+                    #glEnableVertexAttribArray(1)
+                    pass
+                                                  
+                    
+                    
                 glDrawElementsui(GL_TRIANGLES,self.faces)
+                glDisableClientState(GL_COLOR_ARRAY);
+                glDisableClientState(GL_VERTEX_ARRAY);                
             else: 
                 # draw point cloud
                 glColor( 0.95, 0.207, 0.031 )
                 glPointSize( 6.0 )
                 glEnable( GL_POINT_SMOOTH )
-                glEnableClientState(GL_COLOR_ARRAY)                  
+                glEnableClientState(GL_COLOR_ARRAY) 
                 glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
                 glVertexPointerf( self.points*self.scale)
-                glColorPointerf(self.pointsColors)     
+                glColorPointerf(self.pointsColors) 
                 #self.vbo.bind() # bind the VBO 
                 #glVertexPointer(3, GL_FLOAT, 0, self.vbo) # these vertices contain 3 single precision coordinates
                 glDrawArrays(GL_POINTS, 0, self.points.shape[0])   # draw "count" points from the VBO
