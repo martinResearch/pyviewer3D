@@ -10,7 +10,6 @@ import sys
 from PyQt4 import QtGui
 from OpenGL.GL import *
 from OpenGL.GLU import *
-from PyQt4 import QtGui
 from PyQt4.QtOpenGL import *
 from PyGLWidget import PyGLWidget
 #import collada #from  https://github.com/pycollada/pycollada
@@ -28,6 +27,33 @@ def normalize_v3(arr):
     arr[:,1] /= lens
     arr[:,2] /= lens                
     return arr
+
+
+def computeFaceNormals(faces,vertices):
+    # from https://sites.google.com/site/dlampetest/python/calculating-normals-of-a-triangle-mesh-using-numpy   
+    #Create an indexed view into the vertex array using the array of three indices for triangles
+    tris = vertices[faces]
+    #Calculate the normal for all the triangles, by taking the cross product of the vectors v1-v0, and v2-v0 in each triangle             
+    n = numpy.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )
+    # n is now an array of normals per triangle. The length of each normal is dependent the vertices, 
+    # we need to normalize these, so that our next step weights each normal equally.
+    normalize_v3(n)
+    return n
+
+          
+def computeVertexNormals(faces,vertices):         
+    n=computeFaceNormals(faces,vertices)
+    # now we have a normalized array of normals, one per triangle, i.e., per triangle normals.
+    # But instead of one per triangle (i.e., flat shading), we add to each vertex in that triangle, 
+    # the triangles' normal. Multiple triangles would then contribute to every vertex, so we need to normalize again afterwards.
+    # The cool part, we can actually add the normals through an indexed view of our (zeroed) per vertex normal array    
+    #Create a zeroed array with the same type and shape as our vertices i.e., per vertex normal
+    norm = numpy.zeros( vertices.shape, dtype=vertices.dtype )        
+    norm[ faces[:,0] ] += n
+    norm[ faces[:,1] ] += n
+    norm[ faces[:,2] ] += n
+    normalize_v3(norm)
+    return norm 
 
 class ColladaWidget(PyGLWidget):
 
@@ -77,13 +103,29 @@ class MeshWidget(PyGLWidget):
         self.points=numpy.array(points,dtype=numpy.float32)
         self.pointsColors=numpy.array(vertexColors,dtype=numpy.float32)
         self.faces=numpy.array(faces,dtype=numpy.uint32)
-        self.normals=normals
+        assert(max(self.faces.flatten())<self.points.shape[0])
+        if faces!=[]: 
+            if normals==[]:
+                self.normals=computeVertexNormals(self.faces,self.points)
+            else:        
+                self.normals=normals
         self.scale=1
         #self.faces=numpy.array([[1,2,3],[3,4,5]],dtype=numpy.int32)
         # create a Vertex Buffer Object with the specified data
         self.vbo = glvbo.VBO(self.points)    # from # http://cyrille.rossant.net/blog/page/3/   
         
-
+    def computeFaceNormals(self,vertices,faces):   
+        norm = numpy.zeros(vertices.shape, dtype=vertices.dtype)          
+        tris = vertices[faces]                   
+        n = numpy.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )          
+        normalize_v3(n)
+        return n
+    def computeVertexNormals(self,vertices,faces):   
+        norm = numpy.zeros(vertices.shape, dtype=vertices.dtype)          
+        tris = vertices[faces]                   
+        n = numpy.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )          
+        normalize_v3(n)
+        return n    
               
             
     def paintGL(self):
@@ -107,8 +149,6 @@ class MeshWidget(PyGLWidget):
                 glNormalPointerf( self.normals)
                 glEnableClientState(GL_VERTEX_ARRAY)#tell OpenGL that the VBO contains an array of vertices
                 glVertexPointerf( self.points*self.scale)
-                glColorPointerf(self.pointsColors)   
-              
                 glDrawElementsui(GL_TRIANGLES,self.faces)
             else: 
                 # draw point cloud
@@ -124,6 +164,7 @@ class MeshWidget(PyGLWidget):
                 glDrawArrays(GL_POINTS, 0, self.points.shape[0])   # draw "count" points from the VBO
               
         glFlush()
+  
         
     def openMesh(self,fname):
         inputFormat=meshconvert.getFormat(fname,"garbage")
@@ -142,25 +183,8 @@ class MeshWidget(PyGLWidget):
                 faces.append([int(i) for i in t.list])
         faces= numpy.array(faces,dtype=numpy.int32)   
         vertices=numpy.array(vertices,dtype=numpy.float32)         
-        # from https://sites.google.com/site/dlampetest/python/calculating-normals-of-a-triangle-mesh-using-numpy       
-        #Create a zeroed array with the same type and shape as our vertices i.e., per vertex normal
-        norm = numpy.zeros( vertices.shape, dtype=vertices.dtype )
-        #Create an indexed view into the vertex array using the array of three indices for triangles
-        tris = vertices[faces]
-        #Calculate the normal for all the triangles, by taking the cross product of the vectors v1-v0, and v2-v0 in each triangle             
-        n = numpy.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )
-        # n is now an array of normals per triangle. The length of each normal is dependent the vertices, 
-        # we need to normalize these, so that our next step weights each normal equally.
-        normalize_v3(n)
-        # now we have a normalized array of normals, one per triangle, i.e., per triangle normals.
-        # But instead of one per triangle (i.e., flat shading), we add to each vertex in that triangle, 
-        # the triangles' normal. Multiple triangles would then contribute to every vertex, so we need to normalize again afterwards.
-        # The cool part, we can actually add the normals through an indexed view of our (zeroed) per vertex normal array
-        norm[ faces[:,0] ] += n
-        norm[ faces[:,1] ] += n
-        norm[ faces[:,2] ] += n
-        normalize_v3(norm)
-        self.plotPoints(vertices,vertexColors=vertexColors,faces=faces,normals=norm)    
+       
+        self.plotPoints(vertices,vertexColors=vertexColors,faces=faces)    
         
 
 
