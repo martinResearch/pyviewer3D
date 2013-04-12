@@ -67,7 +67,7 @@ class PyGLWidget(QtOpenGL.QGLWidget):
         self.last_point_ok_ = False
         self.last_point_3D_ = [1.0, 0.0, 0.0]
         self.isInRotation_  = False
-
+        self.ctrlPressed_=False
         # connections
         #self.signalGLMatrixChanged.connect(self.printModelViewMatrix)
 
@@ -130,7 +130,7 @@ class PyGLWidget(QtOpenGL.QGLWidget):
         glLoadMatrixd(self.modelview_matrix_)
         self.updateGL()
    
-    def translate(self, _trans):
+    def translate(self, _trans,translate_center=False):
         # Translate the object by _trans
         # Update modelview_matrix_
         self.makeCurrent()
@@ -143,6 +143,11 @@ class PyGLWidget(QtOpenGL.QGLWidget):
         self.translate_vector_[1] = self.modelview_matrix_[3][1]
         self.translate_vector_[2] = self.modelview_matrix_[3][2]
         self.signalGLMatrixChanged.emit()
+      
+        if translate_center:
+            self.center_[0]-=_trans[0]
+            self.center_[1]-=_trans[1]
+            self.center_[2]-=_trans[2]
 
     def rotate(self, _axis, _angle):
         t = [self.modelview_matrix_[0][0] * self.center_[0] +
@@ -205,7 +210,11 @@ class PyGLWidget(QtOpenGL.QGLWidget):
             return True, _v3D
         else:
             return False, _v3D
-
+        
+    def keyPressEvent(self, _event):
+        self.ctrlPressed_=True 
+    def keyReleaseEvent(self, _event):
+        self.ctrlPressed_=False
     def wheelEvent(self, _event):
         # Use the mouse wheel to zoom in/out
         
@@ -213,6 +222,7 @@ class PyGLWidget(QtOpenGL.QGLWidget):
         self.translate([0.0, 0.0, d])
         self.updateGL()
         _event.accept()
+        
 
     def mousePressEvent(self, _event):
         self.last_point_2D_ = _event.pos()
@@ -242,10 +252,13 @@ class PyGLWidget(QtOpenGL.QGLWidget):
         self.makeCurrent()
 
         # move in z direction
+        
+            
         if (((_event.buttons() & QtCore.Qt.LeftButton) and (_event.buttons() & QtCore.Qt.MidButton))
             or (_event.buttons() & QtCore.Qt.LeftButton and _event.modifiers() & QtCore.Qt.ControlModifier)):
             value_y = self.radius_ * dy * 2.0 / h;
-            self.translate([0.0, 0.0, value_y])
+            translate_center= (_event.buttons() & QtCore.Qt.RightButton)
+            self.translate([0.0, 0.0, value_y], translate_center)
         # move in x,y direction
         elif (_event.buttons() & QtCore.Qt.MidButton
               or (_event.buttons() & QtCore.Qt.LeftButton and _event.modifiers() & QtCore.Qt.ShiftModifier)):
@@ -262,10 +275,10 @@ class PyGLWidget(QtOpenGL.QGLWidget):
             n      = 0.01 * self.radius_
             up     = math.tan(fovy / 2.0 * math.pi / 180.0) * n
             right  = aspect * up
-
+            translate_center= (_event.buttons() & QtCore.Qt.RightButton)
             self.translate( [2.0 * dx / w * right / n * z,
                              -2.0 * dy / h * up / n * z,
-                             0.0] )
+                             0.0] ,translate_center)
 
     
         # rotate
