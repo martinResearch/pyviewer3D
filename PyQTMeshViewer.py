@@ -98,6 +98,7 @@ class MeshWidget(PyGLWidget):
         self.points= []
         self.pointsColors=[]
         self.faces=[]
+        parent.setCentralWidget(self)
 
     def plotPoints(self,points,vertexColors=[],faces=[],normals=[],faceColors=[]):
         self.points=numpy.array(points,dtype=numpy.float32)
@@ -121,18 +122,7 @@ class MeshWidget(PyGLWidget):
         # create a Vertex Buffer Object with the specified data
         self.vbo = glvbo.VBO(self.points)    # from # http://cyrille.rossant.net/blog/page/3/   
         
-    def computeFaceNormals(self,vertices,faces):   
-        norm = numpy.zeros(vertices.shape, dtype=vertices.dtype)          
-        tris = vertices[faces]                   
-        n = numpy.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )          
-        normalize_v3(n)
-        return n
-    def computeVertexNormals(self,vertices,faces):   
-        norm = numpy.zeros(vertices.shape, dtype=vertices.dtype)          
-        tris = vertices[faces]                   
-        n = numpy.cross( tris[::,1 ] - tris[::,0]  , tris[::,2 ] - tris[::,0] )          
-        normalize_v3(n)
-        return n    
+
               
             
     def paintGL(self):
@@ -233,7 +223,7 @@ class SimpleMeshViewerUI(QtGui.QMainWindow):
     def initUI(self):
 
         self.glWidget = MeshWidget(self)
-        self.setCentralWidget(self.glWidget)
+     
         self.statusBar()
 
         openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
