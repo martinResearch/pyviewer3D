@@ -1,6 +1,0 @@
-http://stackoverflow.com/questions/838761/robust-algorithm-for-surface-reconstruction-from-3d-point-cloud
-http://www.cs.jhu.edu/~misha/Code/PoissonRecon/Version4.51/
-
-how to cope with the color ? 
-http://www.pcl-users.org/Wht-to-do-after-poisson-reconstruction-td4018952.html
-http://homes.esat.kuleuven.be/~visit3d/webservice/v2/download.php

@@ -52,6 +52,12 @@ def cli(argv, prog=None):
 	except ImportError:
 		raise ValueError, "Unknown mesh format: "+outputFormat
 	outputModule.writer(open(outputFile, outputModule.modeW), inputModule.reader(open(inputFile, inputModule.modeR)))
+def getReader(fname):
+	inputFormat=getFormat(fname,"garbage")
+	inputModule =  __import__(inputFormat, globals(),  locals(), [""])
+	file =open(fname ,'r')
+	r=inputModule.reader(file)
+	return r
 
 if __name__ == "__main__":
 	cli(sys.argv[1:], prog=sys.argv[0])
