@@ -47,13 +47,22 @@ class vtkMeshWidget ():
         self.renWin.AddRenderer(self.ren)
         self.iren = self.renWin.GetInteractor()
         self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+        self.iren.AddObserver("MiddleButtonPressEvent", self.MiddleButtonEvent)
         self.iren.AddObserver("KeyPressEvent", self.Keypress)
         self.iren .Initialize()
+        self.renWin.Render()
+        self.iren.Start()    
+        
 
+
+    def MiddleButtonEvent(self,obj, event):         
+        (x,y) = self.iren.GetEventPosition()
+        idcell,point=self.pickCell(x,y)
+        print 'picked cell '+str(idcell) 
+        self.ren.GetActiveCamera().SetFocalPoint( point[0],point[1],point[2])        
 
     def Keypress(self):
         pass
-
 
 
 
@@ -167,7 +176,7 @@ class vtkMeshWidget ():
 
 
 
-    def vtk_point_cloud(self,points):
+    def plotPoints(self,points):
 
         vtk_points = vtk.vtkPoints()
         vtk_verts = vtk.vtkCellArray()
@@ -220,17 +229,88 @@ class vtkMeshWidget ():
         actor.GetProperty().SetPointSize( 5)
         #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
         # how do we rander disk instead of small square  for the points ?!
-        return actor
+       
 
-    def plotPoints(self,points):
-
-        actor=self.vtk_point_cloud(points)
         self.ren.AddActor(actor)
         self.renWin.Render()
+        
+        
+    def plotSurface(self,points,faces):
+        
+            
+        vtk_points = vtk.vtkPoints()
+        vtk_verts = vtk.vtkCellArray()
+        vtk_triangles = vtk.vtkCellArray()
+        vtk_colors = vtk.vtkUnsignedCharArray()
+        vtk_colors.SetNumberOfComponents(3)
+        vtk_colors.SetName( "Colors")
+        cell = 0
+        
+        box=numpy.zeros(shape=(3,2),dtype=float)
+        box[:,0]=numpy.inf
+        box[:,1]=-numpy.inf
+        
+        
+        for point in points:
+            p = point.coord
+            box[:,0]=numpy.minimum(box[:,0],p)
+            box[:,1]=numpy.maximum(box[:,0],p)
+            vtk_points.InsertNextPoint(p[0],p[1],p[2])
+            
+        for f in faces:
+            # inspired from http://stackoverflow.com/questions/7548966/how-to-display-only-triangle-boundaries-on-textured-surface-in-vtk
+            triangle = vtk.vtkTriangle()  
+            triangle.GetPointIds().SetId(0,f[0])
+            triangle.GetPointIds().SetId(1,f[1])
+            triangle.GetPointIds().SetId(2,f[2])   
+            vtk_triangles.InsertNextCell(triangle)
+            
+         
+        
+        self.sceneWidth=max(box[:,1]-box[:,0])
+        
+        
+
+        poly = vtk.vtkPolyData()
+        poly.SetPoints(vtk_points)
+        #poly.SetVerts(vtk_verts) #causes my machine to crash 3 line below
+        poly.SetPolys(vtk_triangles)
+        
+        #poly.GetPointData().SetScalars(vtk_colors)
+
+        #print poly# martin de la gorce : causes my machine to crash if i use verts
+
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInput(poly)
 
 
-    def plotSurface():
-        pass
+        #mapper.SetInputConnection( line2.GetOutputPort() )
+
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+        actor.GetProperty().SetColor( 0., 0., 1. )
+        #actor.GetProperty().SetOpacity(0.7) need to do depth sorting : http://code.google.com/p/pythonxy/source/browse/src/python/vtk/DOC/Examples/VisualizationAlgorithms/DepthSort.py?name=v2.6.6.0&r=001d041959c95a363f4f247643ce759a0a2eb1f6
+        actor.GetProperty().SetLineWidth( 0)
+        actor.GetProperty().SetRepresentationToPoints
+        actor.GetProperty().SetPointSize( 5)
+        #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
+        # how do we rander disk instead of small square  for the points ?!
+       
+
+        self.ren.AddActor(actor)
+        self.renWin.Render()
+       
+      
+    def pickCell(self,x,y): 
+        #picker = vtk.vtkPropPicker()
+        #picker.PickProp(x, y, self.renderer, EventHandler().get_markers())
+        #actor = picker.GetActor()
+        #from http://nullege.com/codes/show/src@m@u@MultiScaleSVD-HEAD@icicle_noview_textured.py/599/vtk.vtkCellPicker
+        cellPicker = vtk. vtkCellPicker()
+        someCellPicked = cellPicker.Pick(x,y,0,self.ren)
+        pickedCellId = cellPicker.GetCellId()
+        p=cellPicker.GetPickedPositions()
+        return pickedCellId,p.GetPoint(0)
 
     def picking():
         pass
@@ -279,12 +359,13 @@ class Example(QtGui.QMainWindow):
             
         faces=[]        
         for t in r.readElementIndexed():
-            faces.append(t.list)
+            faces.append([int(iv)-1 for iv in t.list])
            
             
 
         points =[Point(coord,color=color) for coord,color in zip(vertices,vertexColors)]
         self.viewWidget.plotPoints(points)
+        self.viewWidget.plotSurface(points,faces)
         # creat numpy arrays
         # vertices
         # normals
