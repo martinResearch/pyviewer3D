@@ -22,30 +22,37 @@ import OpenGL.arrays.vbo as glvbo
 
 
 import vtk
+from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
-class vtkMeshView ():
-    def __init__(self, renWin=''):
-         # create a rendering window and renderer
+
+class Point():
+    def __init__(self,coord,color=[]):
+        self.coord=coord
+        self.color=color
+
+
+
+class vtkMeshWidget ():
+    def __init__(self,MainWindow):
+
+        self.centralWidget = QtGui.QWidget(MainWindow)
+        self.vtkWidget = QVTKRenderWindowInteractor(self.centralWidget)
+        self.gridlayout = QtGui.QGridLayout(self.centralWidget)
+        self.gridlayout.setMargin(0)
+        self.gridlayout.addWidget(self.vtkWidget, 0, 0, 1, 1)
+        MainWindow.setCentralWidget(self.centralWidget)
+        renWin= self.vtkWidget.GetRenderWindow()
+        self.renWin=renWin
         self.ren = vtk.vtkRenderer()
-        if renWin=='':
-            self.renWin = vtk.vtkRenderWindow()
-            self.renWin.AddRenderer(self.ren)
-            # create a renderwindowinteractor
-            self.iren = vtk.vtkRenderWindowInteractor()
-            self.iren.SetRenderWindow(self.renWin)
-            self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())# go here for examples of vtk using python http://www.vtk.org/Wiki/VTK/Examples/Python
-            self.iren.AddObserver("KeyPressEvent", self.Keypress)
-            self.iren.Initialize()
-            self.renWin.Render()
-            #self.renWin.SetSize(600,600)
-        else:
-            self.renWin=renWin
-            self.renWin.AddRenderer(self.ren)
-            self.iren = self.renWin.GetInteractor()
-            self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
-            self.iren.AddObserver("KeyPressEvent", self.Keypress)
-            self.iren .Initialize()
+        self.renWin.AddRenderer(self.ren)
+        self.iren = self.renWin.GetInteractor()
+        self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+        self.iren.AddObserver("KeyPressEvent", self.Keypress)
+        self.iren .Initialize()
 
+
+    def Keypress(self):
+        pass
 
 
 
@@ -155,6 +162,11 @@ class vtkMeshView ():
 
         return ass
 
+
+
+
+
+
     def vtk_point_cloud(self,points):
 
         vtk_points = vtk.vtkPoints()
@@ -164,23 +176,26 @@ class vtkMeshView ():
         vtk_colors.SetName( "Colors")
         cell = 0
 
-        box=zeros(shape=(3,2),dtype=float)
-        box[:,0]=inf
-        box[:,1]=-inf
+        box=numpy.zeros(shape=(3,2),dtype=float)
+        box[:,0]=numpy.inf
+        box[:,1]=-numpy.inf
 
 
         for point in points:
-            p = point.xyz
-            box[:,0]=minimum(box[:,0],p)
-            box[:,1]=maximum(box[:,0],p)
+            p = point.coord
+            box[:,0]=numpy.minimum(box[:,0],p)
+            box[:,1]=numpy.maximum(box[:,0],p)
             vtk_points.InsertNextPoint(p[0],p[1],p[2])
             #vtk_verts.InsertNextCell(cell)
             vtk_verts.InsertNextCell(1)
             vtk_verts.InsertCellPoint(cell)
-            vtk_colors.InsertNextTuple3( *point.color )
+            if len(point.color)>0:
+                vtk_colors.InsertNextTuple3(point.color[0],point.color[1],point.color[2] )
+            else:
+                vtk_colors.InsertNextTuple3(255,255,255 )
             cell += 1
 
-        setSceneWidth(max(box[:,1]-box[:,0]) )
+        self.sceneWidth=max(box[:,1]-box[:,0])
 
 
 
@@ -207,12 +222,12 @@ class vtkMeshView ():
         # how do we rander disk instead of small square  for the points ?!
         return actor
 
-    def plotPoints(self,points,vertexColors=[]):
+    def plotPoints(self,points):
 
-        actor=vtk_point_cloud(points)
+        actor=self.vtk_point_cloud(points)
         self.ren.AddActor(actor)
         self.renWin.Render()
-        
+
 
     def plotSurface():
         pass
@@ -223,17 +238,16 @@ class vtkMeshView ():
 
 
 
+
 class Example(QtGui.QMainWindow):
 
     def __init__(self):
         super(Example, self).__init__()
 
-        self.initUI()
-
-    def initUI(self):
 
         self.viewWidget = vtkMeshWidget(self)
-        self.setCentralWidget(self.glWidget)
+
+
         self.statusBar()
 
         openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
@@ -262,8 +276,15 @@ class Example(QtGui.QMainWindow):
         for t in r.readNode():
             vertices.append([float(t.x),float(t.y),float(t.z)])
             vertexColors.append([float(x)/255 for x in t.color])
+            
+        faces=[]        
+        for t in r.readElementIndexed():
+            faces.append(t.list)
+           
+            
 
-        self.glWidget.plotPoints(vertices,vertexColors=vertexColors)
+        points =[Point(coord,color=color) for coord,color in zip(vertices,vertexColors)]
+        self.viewWidget.plotPoints(points)
         # creat numpy arrays
         # vertices
         # normals

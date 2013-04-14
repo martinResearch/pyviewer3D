@@ -33,7 +33,7 @@ class reader(object):
 		self.lineno = 0
 
 class node(object):
-	def __init__(self, x, y, z, label='1', color='0'):
+	def __init__(self, x, y, z, label='1', color=[]):
 		"Mesh node"
 		self.x = x
 		self.y = y
