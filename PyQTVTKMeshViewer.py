@@ -58,9 +58,11 @@ class vtkMeshWidget ():
 
     def MiddleButtonEvent(self,obj, event):         
         (x,y) = self.iren.GetEventPosition()
+        self.renWin.Render()
         idcell,point=self.pickCell(x,y)
-        print 'picked cell '+str(idcell)         
-        self.lastPickedPoint=point
+        if idcell!=[]:
+            print 'picked cell '+str(idcell)         
+            self.lastPickedPoint=point
 
     def Keypress(self,obj, event):
         
@@ -328,25 +330,31 @@ class vtkMeshWidget ():
         #from http://nullege.com/codes/show/src@m@u@MultiScaleSVD-HEAD@icicle_noview_textured.py/599/vtk.vtkCellPicker
         cellPicker = vtk. vtkCellPicker()
         someCellPicked = cellPicker.Pick(x,y,0,self.ren)
-        pickedCellId = cellPicker.GetCellId()
-        #actor=cellPicker.GetActor()
-        #cells=actor.GetMapper().GetInput().GetPolys()
-        #cellsData=cells=actor.GetMapper().GetInput().GetCellData()
-        #idList = vtk.vtkIdList()
-        #cells.GetNumberOfCells()
-        #data=cells.GetData()
-        #face=[]
-        #for i in range(3):
-            #face.append(data.GetValue(4*pickedCellId+i+1))
+        if  someCellPicked:
+            pickedCellId = cellPicker.GetCellId()
+            p=cellPicker.GetPickedPositions()
+            p3D=p.GetPoint(0)
+            #actor=cellPicker.GetActor()
+            #cells=actor.GetMapper().GetInput().GetPolys()
+            #cellsData=cells=actor.GetMapper().GetInput().GetCellData()
+            #idList = vtk.vtkIdList()
+            #cells.GetNumberOfCells()
+            #data=cells.GetData()
+            #face=[]
+            #for i in range(3):
+                #face.append(data.GetValue(4*pickedCellId+i+1))
+           
+            #plotSurface(self,points,faces,faceColors=[[0,0,1]])   
+            
+            ##cells.GetCell(pickedCellId,idList)
+            ##for i in range(idList.GetNumberOfIds()):
+            ##    print idList.GetId(i)# does no work...
+        else:
+            pickedCellId=[]
+            p3D=[]
+            
        
-        #plotSurface(self,points,faces,faceColors=[[0,0,1]])   
-        
-        ##cells.GetCell(pickedCellId,idList)
-        ##for i in range(idList.GetNumberOfIds()):
-        ##    print idList.GetId(i)# does no work...
-        
-        p=cellPicker.GetPickedPositions()
-        return pickedCellId,p.GetPoint(0)
+        return pickedCellId,p3D
 
   
 
