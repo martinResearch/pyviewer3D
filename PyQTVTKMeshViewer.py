@@ -177,6 +177,8 @@ class vtkMeshWidget ():
 
 
     def plotPoints(self,points):
+        
+        # look here for vtk examples in python http://www.vtk.org/Wiki/VTK/Examples/Python
 
         vtk_points = vtk.vtkPoints()
         vtk_verts = vtk.vtkCellArray()
@@ -212,7 +214,7 @@ class vtkMeshWidget ():
         poly.SetPoints(vtk_points)
         poly.SetVerts(vtk_verts) #causes my machine to crash 3 line below
         poly.GetPointData().SetScalars(vtk_colors)
-
+               
         #print poly# martin de la gorce : causes my machine to crash if i use verts
 
         mapper = vtk.vtkPolyDataMapper()
@@ -235,7 +237,7 @@ class vtkMeshWidget ():
         self.renWin.Render()
         
         
-    def plotSurface(self,points,faces):
+    def plotSurface(self,points,faces,faceColors=[]):
         
             
         vtk_points = vtk.vtkPoints()
@@ -257,12 +259,17 @@ class vtkMeshWidget ():
             box[:,1]=numpy.maximum(box[:,0],p)
             vtk_points.InsertNextPoint(p[0],p[1],p[2])
             
-        for f in faces:
+        for idf,f in enumerate(faces):
             # inspired from http://stackoverflow.com/questions/7548966/how-to-display-only-triangle-boundaries-on-textured-surface-in-vtk
             triangle = vtk.vtkTriangle()  
             triangle.GetPointIds().SetId(0,f[0])
             triangle.GetPointIds().SetId(1,f[1])
             triangle.GetPointIds().SetId(2,f[2])   
+            if len(faceColors)>0:   
+                facecolor=faceColors[idf]
+                vtk_colors.InsertNextTuple3(facecolor[0],facecolor[1],facecolor[2] )
+            else:
+                vtk_colors.InsertNextTuple3(255,255,255 )
             vtk_triangles.InsertNextCell(triangle)
             
          
@@ -275,6 +282,11 @@ class vtkMeshWidget ():
         poly.SetPoints(vtk_points)
         #poly.SetVerts(vtk_verts) #causes my machine to crash 3 line below
         poly.SetPolys(vtk_triangles)
+       
+        poly.GetCellData().SetScalars(vtk_colors)
+        poly.Modified()
+        if vtk.VTK_MAJOR_VERSION <= 5:
+            poly.Update()        
         
         #poly.GetPointData().SetScalars(vtk_colors)
 
@@ -288,7 +300,9 @@ class vtkMeshWidget ():
 
         actor = vtk.vtkActor()
         actor.SetMapper(mapper)
-        actor.GetProperty().SetColor( 0., 0., 1. )
+        #if len(faceColors)==0:
+        #    actor.GetProperty().SetColor( 0., 0., 1. )
+        
         #actor.GetProperty().SetOpacity(0.7) need to do depth sorting : http://code.google.com/p/pythonxy/source/browse/src/python/vtk/DOC/Examples/VisualizationAlgorithms/DepthSort.py?name=v2.6.6.0&r=001d041959c95a363f4f247643ce759a0a2eb1f6
         actor.GetProperty().SetLineWidth( 0)
         actor.GetProperty().SetRepresentationToPoints
