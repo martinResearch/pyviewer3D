@@ -49,23 +49,25 @@ class vtkMeshWidget ():
         self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
         self.iren.AddObserver("MiddleButtonPressEvent", self.MiddleButtonEvent)
         self.iren.AddObserver("KeyPressEvent", self.Keypress)
+        self.iren.AddObserver("KeyReleaseEvent", self.Keypress)
         self.iren .Initialize()
         self.renWin.Render()
         self.iren.Start()    
         
-
+        self.lastPickedPoint=[]
 
     def MiddleButtonEvent(self,obj, event):         
         (x,y) = self.iren.GetEventPosition()
         idcell,point=self.pickCell(x,y)
-        print 'picked cell '+str(idcell) 
-        self.ren.GetActiveCamera().SetFocalPoint( point[0],point[1],point[2])        
+        print 'picked cell '+str(idcell)         
+        self.lastPickedPoint=point
 
-    def Keypress(self):
-        pass
-
-
-
+    def Keypress(self,obj, event):
+        
+        if obj.GetKeyCode()=='c':
+            if len(self.lastPickedPoint)>0:
+                self.ren.GetActiveCamera().SetFocalPoint(self.lastPickedPoint[0],self.lastPickedPoint[1],self.lastPickedPoint[2])    
+                self.renWin.Render()
 
 
 
@@ -239,7 +241,7 @@ class vtkMeshWidget ():
         
     def plotSurface(self,points,faces,faceColors=[]):
         
-            
+        self.faces=faces   
         vtk_points = vtk.vtkPoints()
         vtk_verts = vtk.vtkCellArray()
         vtk_triangles = vtk.vtkCellArray()
@@ -312,6 +314,10 @@ class vtkMeshWidget ():
        
 
         self.ren.AddActor(actor)
+        self.center=0.5*(box[:,1]+box[:,0])
+        
+        self.ren.GetActiveCamera().SetPosition( self.center[0], self.center[1], self.center[2]+self.sceneWidth)
+        self.ren.GetActiveCamera().SetFocalPoint( self.center[0], self.center[1], self.center[2])
         self.renWin.Render()
        
       
@@ -323,11 +329,26 @@ class vtkMeshWidget ():
         cellPicker = vtk. vtkCellPicker()
         someCellPicked = cellPicker.Pick(x,y,0,self.ren)
         pickedCellId = cellPicker.GetCellId()
+        #actor=cellPicker.GetActor()
+        #cells=actor.GetMapper().GetInput().GetPolys()
+        #cellsData=cells=actor.GetMapper().GetInput().GetCellData()
+        #idList = vtk.vtkIdList()
+        #cells.GetNumberOfCells()
+        #data=cells.GetData()
+        #face=[]
+        #for i in range(3):
+            #face.append(data.GetValue(4*pickedCellId+i+1))
+       
+        #plotSurface(self,points,faces,faceColors=[[0,0,1]])   
+        
+        ##cells.GetCell(pickedCellId,idList)
+        ##for i in range(idList.GetNumberOfIds()):
+        ##    print idList.GetId(i)# does no work...
+        
         p=cellPicker.GetPickedPositions()
         return pickedCellId,p.GetPoint(0)
 
-    def picking():
-        pass
+  
 
 
 
@@ -375,7 +396,7 @@ class Example(QtGui.QMainWindow):
         for t in r.readElementIndexed():
             faces.append([int(iv)-1 for iv in t.list])
            
-            
+        
 
         points =[Point(coord,color=color) for coord,color in zip(vertices,vertexColors)]
         self.viewWidget.plotPoints(points)
