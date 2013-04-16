@@ -57,12 +57,12 @@ class vtkMeshWidget ():
         self.iren = self.renWin.GetInteractor()
         self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
         self.iren.AddObserver("MiddleButtonPressEvent", self.MiddleButtonEvent)
-        self.iren.AddObserver("KeyPressEvent", self.Keypress)
-        self.iren.AddObserver("KeyReleaseEvent", self.Keypress)
+        self.iren.AddObserver("KeyPressEvent", self.Keypressed)
+        #self.iren.AddObserver("KeyReleaseEvent", self.Keypressed)
         self.iren .Initialize()
         self.renWin.Render()
         self.iren.Start()    
-        
+        self.cuttingPlanes = vtk.vtkPlaneCollection()
         self.lastPickedPoint=[]
 
     def MiddleButtonEvent(self,obj, event):         
@@ -73,7 +73,7 @@ class vtkMeshWidget ():
             print 'picked cell '+str(idcell)         
             self.lastPickedPoint=point
 
-    def Keypress(self,obj, event):
+    def Keypressed(self,obj, event):
         
         if obj.GetKeyCode()=='c':
             if len(self.lastPickedPoint)>0:
@@ -352,7 +352,15 @@ class vtkMeshWidget ():
         self.center=[0,0,0]
         self.renWin.Render()
         
-    def addCuttingPlane(self):
+    def getCuttingPlanes(self):
+        self.cuttingPlanes.InitTraversal()
+        l=[]
+        for i in range(self.cuttingPlanes.GetNumberOfItems()):
+            l.append(self.cuttingPlanes.GetNextItem())
+        return l
+    
+        
+    def addCuttingPlane(self,origin,normal):
         #create a plane to cut,here it cuts in the XZ direction (xz normal=(1,0,0);XY =(0,0,1),YZ =(0,1,0)
         plane=vtk.vtkPlane()
         plane.SetOrigin(self.center[0],self.center[1],self.center[2])
@@ -365,11 +373,11 @@ class vtkMeshWidget ():
         
         plane1 = vtk.vtkPlane()
         self.cuttingplane=plane1 
-        plane1.SetOrigin(0, 0, 0)
-        plane1.SetNormal(-1, 0, 0)  # keep everything in direction of normal
+        plane1.SetOrigin(origin[0], origin[1], origin[2])
+        plane1.SetNormal(normal[0], normal[1], normal[2])  # keep everything in direction of normal
               
-        xplaneColl = vtk.vtkPlaneCollection()
-        xplaneColl.AddItem(plane1)        
+        
+        self.cuttingPlanes.AddItem(plane1)        
            
         
         
@@ -380,7 +388,7 @@ class vtkMeshWidget ():
             a=actors.GetNextActor()
             #cutter.AddInputConnection(self.reader.GetOutputPort())# is need to ba able to generate a vtkAlgorithmOutput from vtkPolyData , cannot find out how to do that
             #cutter.AddInput(a.GetMapper().GetInput())
-            a.GetMapper().SetClippingPlanes(xplaneColl)        
+            a.GetMapper().SetClippingPlanes(self.cuttingPlanes)        
         #cutter.Update()
         #cutterMapper=vtk.vtkPolyDataMapper()
         #cutterMapper.SetInputConnection( cutter.GetOutputPort())         
@@ -480,7 +488,8 @@ class Example(QtGui.QMainWindow):
         self.viewWidget.plotPoints(points)
         self.viewWidget.plotSurface(points,faces)
         #self.viewWidget.plotObjFile (fname)
-        self.viewWidget.addCuttingPlane()
+        #self.viewWidget.addCuttingPlane([0,0,0],[-1,0,0])
+        #self.viewWidget.getCuttingPlanes()
         # creat numpy arrays
         # vertices
         # normals
