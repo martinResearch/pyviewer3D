@@ -232,6 +232,10 @@ class vtkMeshWidget ():
 
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInput(poly)
+        
+        
+        
+        
 
 
         #mapper.SetInputConnection( line2.GetOutputPort() )
@@ -334,32 +338,59 @@ class vtkMeshWidget ():
         self.ren.GetActiveCamera().SetPosition( self.center[0], self.center[1], self.center[2]+self.sceneWidth)
         self.ren.GetActiveCamera().SetFocalPoint( self.center[0], self.center[1], self.center[2])
         self.renWin.Render()
-    
+        
+    def plotObjFile(self,fame):
+        
+        reader= vtk.vtkOBJReader()
+        reader.SetFileName(fame)
+        mapper=vtk.vtkPolyDataMapper()
+        self.reader=reader
+        mapper.SetInputConnection(reader.GetOutputPort()) 
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)        
+        self.ren.AddActor(actor)
+        self.center=[0,0,0]
+        self.renWin.Render()
+        
     def addCuttingPlane(self):
         #create a plane to cut,here it cuts in the XZ direction (xz normal=(1,0,0);XY =(0,0,1),YZ =(0,1,0)
         plane=vtk.vtkPlane()
-        plane.SetOrigin(0,0,0)
+        plane.SetOrigin(self.center[0],self.center[1],self.center[2])
         plane.SetNormal(1,0,0)
          
         #create cutter
-        cutter=vtk.vtkCutter()
+        #cutter=vtk.vtkCutter()
         # clipper = vtk.vtkClipPolyData()
-        cutter.SetCutFunction(plane)
+        #cutter.SetCutFunction(plane)
+        
+        plane1 = vtk.vtkPlane()
+        self.cuttingplane=plane1 
+        plane1.SetOrigin(0, 0, 0)
+        plane1.SetNormal(-1, 0, 0)  # keep everything in direction of normal
+              
+        xplaneColl = vtk.vtkPlaneCollection()
+        xplaneColl.AddItem(plane1)        
+           
+        
+        
+        
         actors=self.ren.GetActors()
         actors.InitTraversal()
         for i in range(actors.GetNumberOfItems()):
             a=actors.GetNextActor()
-            cutter.AddInputConnection(a.GetMapper().GetOutputPort())# is need to ba able to generate a vtkAlgorithmOutput from vtkPolyData , cannot find out how to do that
-        cutter.Update()
-        cutterMapper=vtk.vtkPolyDataMapper()
-        cutterMapper.SetInputConnection( cutter.GetOutputPort())
-         
+            #cutter.AddInputConnection(self.reader.GetOutputPort())# is need to ba able to generate a vtkAlgorithmOutput from vtkPolyData , cannot find out how to do that
+            #cutter.AddInput(a.GetMapper().GetInput())
+            a.GetMapper().SetClippingPlanes(xplaneColl)        
+        #cutter.Update()
+        #cutterMapper=vtk.vtkPolyDataMapper()
+        #cutterMapper.SetInputConnection( cutter.GetOutputPort())         
         #create plane actor
-        planeActor=vtk.vtkActor()
-        planeActor.GetProperty().SetColor(1.0,1,0)
-        planeActor.GetProperty().SetLineWidth(2)
-        planeActor.SetMapper(cutterMapper)
-        self.ren.AddActor(planeActor)
+        #planeActor=vtk.vtkActor()
+        #planeActor.GetProperty().SetColor(1.0,1,0)
+        #planeActor.GetProperty().SetLineWidth(2)
+        #planeActor.SetMapper(cutterMapper)
+        #self.ren.AddActor(planeActor)
+        self.renWin.Render()
       
     def pickCell(self,x,y): 
         #picker = vtk.vtkPropPicker()
@@ -372,6 +403,7 @@ class vtkMeshWidget ():
             pickedCellId = cellPicker.GetCellId()
             p=cellPicker.GetPickedPositions()
             p3D=p.GetPoint(0)
+            
             #actor=cellPicker.GetActor()
             #cells=actor.GetMapper().GetInput().GetPolys()
             #cellsData=cells=actor.GetMapper().GetInput().GetCellData()
@@ -447,7 +479,8 @@ class Example(QtGui.QMainWindow):
         points =[Point(coord,color=color) for coord,color in zip(vertices,vertexColors)]
         self.viewWidget.plotPoints(points)
         self.viewWidget.plotSurface(points,faces)
-        #self.viewWidget.addCuttingPlane()
+        #self.viewWidget.plotObjFile (fname)
+        self.viewWidget.addCuttingPlane()
         # creat numpy arrays
         # vertices
         # normals
