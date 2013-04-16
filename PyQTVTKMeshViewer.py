@@ -36,13 +36,22 @@ class vtkMeshWidget ():
     def __init__(self,MainWindow):
 
         self.centralWidget = QtGui.QWidget(MainWindow)
-        self.vtkWidget = QVTKRenderWindowInteractor(self.centralWidget)
+        self.vtkWidget = QVTKRenderWindowInteractor(self.centralWidget)  
         self.gridlayout = QtGui.QGridLayout(self.centralWidget)
         self.gridlayout.setMargin(0)
         self.gridlayout.addWidget(self.vtkWidget, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.centralWidget)
-        renWin= self.vtkWidget.GetRenderWindow()
-        self.renWin=renWin
+        self.renWin= self.vtkWidget.GetRenderWindow()       
+        self.renWin.PolygonSmoothingOn() 
+        self.renWin.LineSmoothingOn()        
+        self.renWin.PointSmoothingOn()
+        # it seems that qt disable antialiasing 
+        # http://www.vtk.org/pipermail/vtkusers/2008-November/098417.html   
+        # http://www.vtk.org/pipermail/vtkusers/2008-November/098415.html
+        # self.renWin.SetMultiSamples(0)      
+        # self.renWin.SetAAFrames(6)# works on my maching but very slow
+        # QtGui.QPainter.Antialiasing
+        #glEnable(GL_MULTISAMPLE)
         self.ren = vtk.vtkRenderer()
         self.renWin.AddRenderer(self.ren)
         self.iren = self.renWin.GetInteractor()
@@ -295,10 +304,14 @@ class vtkMeshWidget ():
         #poly.GetPointData().SetScalars(vtk_colors)
 
         #print poly# martin de la gorce : causes my machine to crash if i use verts
-
+        #mapper=vtk.vtkCompositeDataGeometryFilter()
+ 
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInput(poly)
-
+        #alg=vtk.vtkPolyDataAlgorithm()
+        #alg.SetInput(poly)
+        #mapper.SetInputConnection(alg.GetOutputPort())        
+        
 
         #mapper.SetInputConnection( line2.GetOutputPort() )
 
@@ -321,7 +334,32 @@ class vtkMeshWidget ():
         self.ren.GetActiveCamera().SetPosition( self.center[0], self.center[1], self.center[2]+self.sceneWidth)
         self.ren.GetActiveCamera().SetFocalPoint( self.center[0], self.center[1], self.center[2])
         self.renWin.Render()
-       
+    
+    def addCuttingPlane(self):
+        #create a plane to cut,here it cuts in the XZ direction (xz normal=(1,0,0);XY =(0,0,1),YZ =(0,1,0)
+        plane=vtk.vtkPlane()
+        plane.SetOrigin(0,0,0)
+        plane.SetNormal(1,0,0)
+         
+        #create cutter
+        cutter=vtk.vtkCutter()
+        # clipper = vtk.vtkClipPolyData()
+        cutter.SetCutFunction(plane)
+        actors=self.ren.GetActors()
+        actors.InitTraversal()
+        for i in range(actors.GetNumberOfItems()):
+            a=actors.GetNextActor()
+            cutter.AddInputConnection(a.GetMapper().GetOutputPort())# is need to ba able to generate a vtkAlgorithmOutput from vtkPolyData , cannot find out how to do that
+        cutter.Update()
+        cutterMapper=vtk.vtkPolyDataMapper()
+        cutterMapper.SetInputConnection( cutter.GetOutputPort())
+         
+        #create plane actor
+        planeActor=vtk.vtkActor()
+        planeActor.GetProperty().SetColor(1.0,1,0)
+        planeActor.GetProperty().SetLineWidth(2)
+        planeActor.SetMapper(cutterMapper)
+        self.ren.AddActor(planeActor)
       
     def pickCell(self,x,y): 
         #picker = vtk.vtkPropPicker()
@@ -409,6 +447,7 @@ class Example(QtGui.QMainWindow):
         points =[Point(coord,color=color) for coord,color in zip(vertices,vertexColors)]
         self.viewWidget.plotPoints(points)
         self.viewWidget.plotSurface(points,faces)
+        #self.viewWidget.addCuttingPlane()
         # creat numpy arrays
         # vertices
         # normals
