@@ -7,7 +7,7 @@
 # could have a look at http://rossant.github.com/galry/ that seem to be able to plot multi miliions of points in python
 
 import sys
-from PyQt4 import QtGui
+from PyQt4 import QtGui,QtCore
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from PyQt4 import QtGui
@@ -30,8 +30,46 @@ class Point():
         self.coord=coord
         self.color=color
 
-
-
+class CutingPlanesWidget(QtGui.QWidget):
+    def __init__(self,viewWidget):
+	    super(CutingPlanesWidget, self).__init__()
+	    vbox = QtGui.QVBoxLayout()        
+	    radioGroup = QtGui.QButtonGroup()        
+	    radioGroup.setExclusive(True)        
+	    bIsFirst=True
+	    listOfChoices=["x","y","z"]
+	    
+	    xSlider = self.createSlider(viewWidget.setXCuttingPlane)
+	    ySlider = self.createSlider(viewWidget.setYCuttingPlane)
+	    zSlider = self.createSlider(viewWidget.setZCuttingPlane)	    
+	    
+	 
+	    vbox.addWidget(xSlider) 
+	    vbox.addWidget(ySlider) 
+	    vbox.addWidget(zSlider) 
+	  
+	  
+	    self.setLayout(vbox)
+	    #self.connect(buttonBox, QtCore.SIGNAL("accepted()"), self.accept)
+	    #self.connect(buttonBox, QtCore.SIGNAL("rejected()"), self.reject)        
+	    #self.show()
+	    #self.exec_()	
+	    #id=radioGroup.checkedId()
+	    #return id,listOfChoices[id] 
+	    
+    def createSlider(self, setterSlot): # coied from grbber.py example from pyside
+	    slider = QtGui.QSlider(QtCore.Qt.Horizontal)
+	    slider.setRange(0, 1000)
+	    slider.setSingleStep(10)
+	    slider.setPageStep(10)
+	    slider.setTickInterval(100)
+	    slider.setTickPosition(QtGui.QSlider.TicksRight)    
+	    slider.valueChanged.connect(setterSlot)
+	    #changedSignal.connect(slider.setValue)
+	
+	    return slider
+	
+	
 class vtkMeshWidget ():
     def __init__(self,MainWindow):
 
@@ -39,7 +77,9 @@ class vtkMeshWidget ():
         self.vtkWidget = QVTKRenderWindowInteractor(self.centralWidget)  
         self.gridlayout = QtGui.QGridLayout(self.centralWidget)
         self.gridlayout.setMargin(0)
-        self.gridlayout.addWidget(self.vtkWidget, 0, 0, 1, 1)
+        self.gridlayout.addWidget(self.vtkWidget, 0, 0)
+        self.cutingPlanesWidget=CutingPlanesWidget(self)
+        self.gridlayout.addWidget(self.cutingPlanesWidget, 0, 1)
         MainWindow.setCentralWidget(self.centralWidget)
         self.renWin= self.vtkWidget.GetRenderWindow()       
         self.renWin.PolygonSmoothingOn() 
@@ -62,7 +102,12 @@ class vtkMeshWidget ():
         self.iren .Initialize()
         self.renWin.Render()
         self.iren.Start()    
-        self.cuttingPlanes = vtk.vtkPlaneCollection()
+        self.cuttingPlanesVtk = vtk.vtkPlaneCollection()
+	self.cuttingPlanes=[]
+	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[1,0,0])
+        self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,1,0])
+        self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,1])
+	
         self.lastPickedPoint=[]
 
     def MiddleButtonEvent(self,obj, event):         
@@ -208,7 +253,7 @@ class vtkMeshWidget ():
         for point in points:
             p = point.coord
             box[:,0]=numpy.minimum(box[:,0],p)
-            box[:,1]=numpy.maximum(box[:,0],p)
+            box[:,1]=numpy.maximum(box[:,1],p)
             vtk_points.InsertNextPoint(p[0],p[1],p[2])
             #vtk_verts.InsertNextCell(cell)
             vtk_verts.InsertNextCell(1)
@@ -218,7 +263,7 @@ class vtkMeshWidget ():
             else:
                 vtk_colors.InsertNextTuple3(255,255,255 )
             cell += 1
-
+	self.box=box
         self.sceneWidth=max(box[:,1]-box[:,0])
 
 
@@ -251,6 +296,8 @@ class vtkMeshWidget ():
        
 
         self.ren.AddActor(actor)
+	self.resetCuttingPlanes()
+	self.refreshCuttingPLanes()
         self.renWin.Render()
         
         
@@ -273,7 +320,7 @@ class vtkMeshWidget ():
         for point in points:
             p = point.coord
             box[:,0]=numpy.minimum(box[:,0],p)
-            box[:,1]=numpy.maximum(box[:,0],p)
+            box[:,1]=numpy.maximum(box[:,1],p)
             vtk_points.InsertNextPoint(p[0],p[1],p[2])
             
         for idf,f in enumerate(faces):
@@ -290,7 +337,7 @@ class vtkMeshWidget ():
             vtk_triangles.InsertNextCell(triangle)
             
          
-        
+        self.box=box
         self.sceneWidth=max(box[:,1]-box[:,0])
         
         
@@ -337,6 +384,9 @@ class vtkMeshWidget ():
         
         self.ren.GetActiveCamera().SetPosition( self.center[0], self.center[1], self.center[2]+self.sceneWidth)
         self.ren.GetActiveCamera().SetFocalPoint( self.center[0], self.center[1], self.center[2])
+        
+	self.resetCuttingPlanes()
+	self.refreshCuttingPLanes()
         self.renWin.Render()
         
     def plotObjFile(self,fame):
@@ -350,45 +400,66 @@ class vtkMeshWidget ():
         actor.SetMapper(mapper)        
         self.ren.AddActor(actor)
         self.center=[0,0,0]
+	self.resetCuttinPlanes()
+	self.refreshCutingPLanes()
         self.renWin.Render()
         
-    def getCuttingPlanes(self):
-        self.cuttingPlanes.InitTraversal()
-        l=[]
-        for i in range(self.cuttingPlanes.GetNumberOfItems()):
-            l.append(self.cuttingPlanes.GetNextItem())
-        return l
-    
-        
-    def addCuttingPlane(self,origin,normal):
-        #create a plane to cut,here it cuts in the XZ direction (xz normal=(1,0,0);XY =(0,0,1),YZ =(0,1,0)
-        plane=vtk.vtkPlane()
-        plane.SetOrigin(self.center[0],self.center[1],self.center[2])
-        plane.SetNormal(1,0,0)
-         
-        #create cutter
-        #cutter=vtk.vtkCutter()
-        # clipper = vtk.vtkClipPolyData()
-        #cutter.SetCutFunction(plane)
-        
-        plane1 = vtk.vtkPlane()
-        self.cuttingplane=plane1 
-        plane1.SetOrigin(origin[0], origin[1], origin[2])
-        plane1.SetNormal(normal[0], normal[1], normal[2])  # keep everything in direction of normal
-              
-        
-        self.cuttingPlanes.AddItem(plane1)        
-           
-        
-        
-        
+    def resetCuttingPlanes(self):
+	self.setXCuttingPlane(0)
+	self.setYCuttingPlane(0)
+	self.setZCuttingPlane(0)	
+       
+      
+    def setXCuttingPlane(self,value):
+	v1=1-float(value)/1000
+	v2=float(value)/1000
+	self.cuttingPlaneX.SetOrigin(self.box[0,0]*v1+self.box[0,1]*v2, 0, 0)	
+	self.renWin.Render()
+    def setYCuttingPlane(self,value):
+	v1=1-float(value)/1000
+	v2=float(value)/1000	
+	self.cuttingPlaneY.SetOrigin(0, self.box[1,0]*v1+self.box[1,1]*v2, 0)
+	self.renWin.Render()
+    def setZCuttingPlane(self,value):
+	v1=1-float(value)/1000
+	v2=float(value)/1000	
+	self.cuttingPlaneZ.SetOrigin(0, 0, self.box[2,0]*v1+self.box[2,1]*v2)  
+	self.renWin.Render()
+	
+    def refreshCuttingPLanes(self):
         actors=self.ren.GetActors()
         actors.InitTraversal()
         for i in range(actors.GetNumberOfItems()):
             a=actors.GetNextActor()
             #cutter.AddInputConnection(self.reader.GetOutputPort())# is need to ba able to generate a vtkAlgorithmOutput from vtkPolyData , cannot find out how to do that
             #cutter.AddInput(a.GetMapper().GetInput())
-            a.GetMapper().SetClippingPlanes(self.cuttingPlanes)        
+            a.GetMapper().SetClippingPlanes(self.cuttingPlanesVtk) 
+	    
+    def addCuttingPlane(self,origin,normal):
+       
+         
+        #create cutter
+        #cutter=vtk.vtkCutter()
+        # clipper = vtk.vtkClipPolyData()
+        #cutter.SetCutFunction(plane)
+        
+        cuttingplane= vtk.vtkPlane()
+       
+        cuttingplane.SetOrigin(origin[0], origin[1], origin[2])
+        cuttingplane.SetNormal(normal[0], normal[1], normal[2])  # keep everything in direction of normal
+              
+        
+        self.cuttingPlanesVtk.AddItem(cuttingplane)    
+	self.cuttingPlanes=[]
+	self.cuttingPlanesVtk.InitTraversal()
+	for i in range(self.cuttingPlanesVtk.GetNumberOfItems()):
+		self.cuttingPlanes.append(self.cuttingPlanesVtk.GetNextItem())	
+	
+        
+        self.refreshCuttingPLanes()
+        
+        
+       
         #cutter.Update()
         #cutterMapper=vtk.vtkPolyDataMapper()
         #cutterMapper.SetInputConnection( cutter.GetOutputPort())         
@@ -399,6 +470,7 @@ class vtkMeshWidget ():
         #planeActor.SetMapper(cutterMapper)
         #self.ren.AddActor(planeActor)
         self.renWin.Render()
+	return cuttingplane
       
     def pickCell(self,x,y): 
         #picker = vtk.vtkPropPicker()
