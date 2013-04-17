@@ -79,7 +79,7 @@ class vtkMeshWidget ():
         self.gridlayout.setMargin(0)
         self.gridlayout.addWidget(self.vtkWidget, 0, 0)
         self.cutingPlanesWidget=CutingPlanesWidget(self)
-        self.gridlayout.addWidget(self.cutingPlanesWidget, 0, 1)
+        self.gridlayout.addWidget(self.cutingPlanesWidget, 1, 0)
         MainWindow.setCentralWidget(self.centralWidget)
         self.renWin= self.vtkWidget.GetRenderWindow()       
         self.renWin.PolygonSmoothingOn() 
@@ -107,7 +107,7 @@ class vtkMeshWidget ():
 	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[1,0,0])
         self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,1,0])
         self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,1])
-	
+	self.box=numpy.array([[0,1],[0,1],[0,1]])
         self.lastPickedPoint=[]
 
     def MiddleButtonEvent(self,obj, event):         
@@ -411,20 +411,21 @@ class vtkMeshWidget ():
        
       
     def setXCuttingPlane(self,value):
+	pass
 	v1=1-float(value)/1000
 	v2=float(value)/1000
 	self.cuttingPlaneX.SetOrigin(self.box[0,0]*v1+self.box[0,1]*v2, 0, 0)	
-	self.renWin.Render()
+	self.renWin.Render() #seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
     def setYCuttingPlane(self,value):
 	v1=1-float(value)/1000
 	v2=float(value)/1000	
 	self.cuttingPlaneY.SetOrigin(0, self.box[1,0]*v1+self.box[1,1]*v2, 0)
-	self.renWin.Render()
+	self.renWin.Render()#seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
     def setZCuttingPlane(self,value):
 	v1=1-float(value)/1000
 	v2=float(value)/1000	
 	self.cuttingPlaneZ.SetOrigin(0, 0, self.box[2,0]*v1+self.box[2,1]*v2)  
-	self.renWin.Render()
+	self.renWin.Render()#seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
 	
     def refreshCuttingPLanes(self):
         actors=self.ren.GetActors()
