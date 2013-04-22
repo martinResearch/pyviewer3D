@@ -2,3 +2,4 @@
 syntax: glob
 *.avi
 *.pyc
+*.bak
