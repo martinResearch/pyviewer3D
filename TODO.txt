@@ -1,0 +1,10 @@
+adding antialisaing , seems tricky :         
+	http://www.vtk.org/pipermail/vtkusers/2008-November/098417.html   
+    http://www.vtk.org/pipermail/vtkusers/2008-November/098415.html
+a strange thing is that if i display edges of the triangle , then edges segment are then antialiased
+	
+make the cutting plane panel removable
+
+display edges only on the edges on the polygon , not on edges btween two triangles part of the same polygon
+	vtk has polygons ("The polygons cannot have any internal holes"  http://www.vtk.org/doc/release/5.0/html/a01894.html) but does not wllow holes in the polygon....
+	will have to create polyline actors : http://www.vtk.org/doc/release/5.0/html/a01895.html

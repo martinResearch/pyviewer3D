@@ -33,29 +33,15 @@ class Point():
 class CutingPlanesWidget(QtGui.QWidget):
     def __init__(self,viewWidget):
 	    super(CutingPlanesWidget, self).__init__()
-	    vbox = QtGui.QVBoxLayout()        
-	    radioGroup = QtGui.QButtonGroup()        
-	    radioGroup.setExclusive(True)        
-	    bIsFirst=True
-	    listOfChoices=["x","y","z"]
-	    
+	    vbox = QtGui.QVBoxLayout()  
 	    xSlider = self.createSlider(viewWidget.setXCuttingPlane)
 	    ySlider = self.createSlider(viewWidget.setYCuttingPlane)
-	    zSlider = self.createSlider(viewWidget.setZCuttingPlane)	    
-	    
-	 
+	    zSlider = self.createSlider(viewWidget.setZCuttingPlane)
 	    vbox.addWidget(xSlider) 
 	    vbox.addWidget(ySlider) 
 	    vbox.addWidget(zSlider) 
-	  
-	  
 	    self.setLayout(vbox)
-	    #self.connect(buttonBox, QtCore.SIGNAL("accepted()"), self.accept)
-	    #self.connect(buttonBox, QtCore.SIGNAL("rejected()"), self.reject)        
-	    #self.show()
-	    #self.exec_()	
-	    #id=radioGroup.checkedId()
-	    #return id,listOfChoices[id] 
+	   
 	    
     def createSlider(self, setterSlot): # coied from grbber.py example from pyside
 	    slider = QtGui.QSlider(QtCore.Qt.Horizontal)
@@ -68,7 +54,32 @@ class CutingPlanesWidget(QtGui.QWidget):
 	    #changedSignal.connect(slider.setValue)
 	
 	    return slider
-	
+
+
+class labellingPanelWidget(QtGui.QWidget):
+    def __init__(self,listLabels):
+		super(labellingPanelWidget, self).__init__()
+		
+		
+		
+		vbox = QtGui.QVBoxLayout()        
+		radioGroup = QtGui.QButtonGroup()        
+		radioGroup.setExclusive(True)        
+		bIsFirst=True
+		
+		for i,row in enumerate(listLabels):
+		    radio = QtGui.QRadioButton(row)
+		    radioGroup.addButton(radio, i)
+		    if bIsFirst:
+			    radio.setChecked(True)
+			    bIsFirst = False
+		    vbox.addWidget(radio) 		
+		
+		
+		
+	      
+	      
+		self.setLayout(vbox)    
 	
 class vtkMeshWidget ():
     def __init__(self,MainWindow):
@@ -109,6 +120,10 @@ class vtkMeshWidget ():
         self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,1])
 	self.box=numpy.array([[0,1],[0,1],[0,1]])
         self.lastPickedPoint=[]
+	self.box=numpy.zeros(shape=(3,2),dtype=float)
+	self.box[:,0]=numpy.inf
+	self.box[:,1]=-numpy.inf	
+	
 
     def MiddleButtonEvent(self,obj, event):         
         (x,y) = self.iren.GetEventPosition()
@@ -245,15 +260,13 @@ class vtkMeshWidget ():
         vtk_colors.SetName( "Colors")
         cell = 0
 
-        box=numpy.zeros(shape=(3,2),dtype=float)
-        box[:,0]=numpy.inf
-        box[:,1]=-numpy.inf
+       
 
 
         for point in points:
             p = point.coord
-            box[:,0]=numpy.minimum(box[:,0],p)
-            box[:,1]=numpy.maximum(box[:,1],p)
+            self.box[:,0]=numpy.minimum(self.box[:,0],p)
+            self.box[:,1]=numpy.maximum(self.box[:,1],p)
             vtk_points.InsertNextPoint(p[0],p[1],p[2])
             #vtk_verts.InsertNextCell(cell)
             vtk_verts.InsertNextCell(1)
@@ -263,7 +276,7 @@ class vtkMeshWidget ():
             else:
                 vtk_colors.InsertNextTuple3(255,255,255 )
             cell += 1
-	self.box=box
+	
         self.sceneWidth=max(box[:,1]-box[:,0])
 
 
@@ -296,6 +309,10 @@ class vtkMeshWidget ():
        
 
         self.ren.AddActor(actor)
+	
+	if self.ren.GetActors().GetNumberOfItems()==1:
+	    self.recenterCamera()	
+	
 	self.resetCuttingPlanes()
 	self.refreshCuttingPLanes()
         self.renWin.Render()
@@ -312,15 +329,13 @@ class vtkMeshWidget ():
         vtk_colors.SetName( "Colors")
         cell = 0
         
-        box=numpy.zeros(shape=(3,2),dtype=float)
-        box[:,0]=numpy.inf
-        box[:,1]=-numpy.inf
+    
         
         
         for point in points:
             p = point.coord
-            box[:,0]=numpy.minimum(box[:,0],p)
-            box[:,1]=numpy.maximum(box[:,1],p)
+            self.box[:,0]=numpy.minimum(self.box[:,0],p)
+            self.box[:,1]=numpy.maximum(self.box[:,1],p)
             vtk_points.InsertNextPoint(p[0],p[1],p[2])
             
         for idf,f in enumerate(faces):
@@ -337,15 +352,13 @@ class vtkMeshWidget ():
             vtk_triangles.InsertNextCell(triangle)
             
          
-        self.box=box
-        self.sceneWidth=max(box[:,1]-box[:,0])
-        
         
 
         poly = vtk.vtkPolyData()
         poly.SetPoints(vtk_points)
         #poly.SetVerts(vtk_verts) #causes my machine to crash 3 line below
         poly.SetPolys(vtk_triangles)
+		
        
         poly.GetCellData().SetScalars(vtk_colors)
         poly.Modified()
@@ -369,25 +382,122 @@ class vtkMeshWidget ():
         actor = vtk.vtkActor()
         actor.SetMapper(mapper)
         #if len(faceColors)==0:
-        #    actor.GetProperty().SetColor( 0., 0., 1. )
+	#actor.GetProperty().SetColor( 0., 0., 1. )
         
         #actor.GetProperty().SetOpacity(0.7) need to do depth sorting : http://code.google.com/p/pythonxy/source/browse/src/python/vtk/DOC/Examples/VisualizationAlgorithms/DepthSort.py?name=v2.6.6.0&r=001d041959c95a363f4f247643ce759a0a2eb1f6
-        actor.GetProperty().SetLineWidth( 0)
-        actor.GetProperty().SetRepresentationToPoints
-        actor.GetProperty().SetPointSize( 5)
+        actor.GetProperty().SetLineWidth( 1)
+     
+	
+	actor.GetProperty().EdgeVisibilityOff();
+	actor.GetProperty().SetEdgeColor(0,0,0);	
         #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
         # how do we rander disk instead of small square  for the points ?!
        
 
         self.ren.AddActor(actor)
-        self.center=0.5*(box[:,1]+box[:,0])
-        
-        self.ren.GetActiveCamera().SetPosition( self.center[0], self.center[1], self.center[2]+self.sceneWidth)
-        self.ren.GetActiveCamera().SetFocalPoint( self.center[0], self.center[1], self.center[2])
+	
+	
+	#Alternative method to display the edges 
+	#inspired from http://stackoverflow.com/questions/7548966/how-to-display-only-triangle-boundaries-on-textured-surface-in-vtk
+	#++++++++++++++++++++++++++++++++++++++++++++++++
+	#Get the edges from the mesh
+	#edges = vtk.vtkExtractEdges()
+	#edges.ColoringOff()
+	#edges.SetInput(poly)
+	#edge_mapper = vtk.vtkPolyDataMapper()
+	#edge_mapper.SetInput(edges.GetOutput())
+	
+	## Make an actor for those edges    
+	#edge_actor = vtk.vtkActor()
+	#edge_actor.SetMapper(edge_mapper)
+	
+	## Make the actor red (there are other ways of doing this also)
+	#edge_actor.GetProperty().SetColor(0,0,0)
+	
+	#self.ren.AddActor(edge_actor)
+	
+	### Avoid z-buffer fighting
+	#vtk.vtkPolyDataMapper().SetResolveCoincidentTopologyToPolygonOffset()	
+	
+	
+	if self.ren.GetActors().GetNumberOfItems()==1:
+	    self.recenterCamera()
         
 	self.resetCuttingPlanes()
 	self.refreshCuttingPLanes()
         self.renWin.Render()
+	
+    def plotPolyLines(self,listPolyLines):
+		
+		
+		vtk_points = vtk.vtkPoints()
+		vtk_lines = vtk.vtkCellArray()
+		
+		
+		      
+		    
+		idp=0
+		for polyLine in listPolyLines:
+		    vtkPolyLine=vtk.vtkPolyLine()
+		    vtkPolyLine.GetPointIds().SetNumberOfIds(len(polyLine)+1);
+		    for i, p in enumerate(polyLine):
+			vtk_points.InsertNextPoint(p[0],p[1],p[2])		    
+			vtkPolyLine.GetPointIds().SetId(i,idp)
+			idp+=1
+			self.box[:,0]=numpy.minimum(self.box[:,0],p)
+			self.box[:,1]=numpy.maximum(self.box[:,1],p)
+		    p =polyLine[0]
+		    vtk_points.InsertNextPoint(p[0],p[1],p[2])
+		   
+		    i=len(polyLine)
+		    vtkPolyLine.GetPointIds().SetId(i,idp)
+		    idp+=1
+		    
+		    vtk_lines.InsertNextCell(vtkPolyLine)
+		    
+		 
+		poly = vtk.vtkPolyData()
+		poly.SetPoints(vtk_points)
+		poly.SetLines(vtk_lines)
+		
+			   
+	 
+		mapper = vtk.vtkPolyDataMapper()
+		mapper.SetInput(poly)
+		
+	
+		actor = vtk.vtkActor()
+		actor.SetMapper(mapper)
+		
+		#actor.GetProperty().SetOpacity(0.7) need to do depth sorting : http://code.google.com/p/pythonxy/source/browse/src/python/vtk/DOC/Examples/VisualizationAlgorithms/DepthSort.py?name=v2.6.6.0&r=001d041959c95a363f4f247643ce759a0a2eb1f6
+		actor.GetProperty().SetLineWidth( 1)		
+		
+		actor.GetProperty().EdgeVisibilityOn();
+		actor.GetProperty().SetEdgeColor(1,0,0);	
+		actor.GetProperty().SetColor( 1, 0., 0 )
+	
+		self.ren.AddActor(actor)
+		
+		
+		
+		### Avoid z-buffer fighting
+		vtk.vtkPolyDataMapper().SetResolveCoincidentTopologyToPolygonOffset()	
+		
+		
+		if self.ren.GetActors().GetNumberOfItems()==1:
+		    self.recenterCamera()
+		
+		
+		self.resetCuttingPlanes()
+		self.refreshCuttingPLanes()
+		self.renWin.Render()  
+    def recenterCamera(self):
+	self.sceneWidth=max(self.box[:,1]-self.box[:,0])
+	self.center=0.5*(self.box[:,1]+self.box[:,0])
+				
+	self.ren.GetActiveCamera().SetPosition( self.center[0], self.center[1], self.center[2]+self.sceneWidth)
+	self.ren.GetActiveCamera().SetFocalPoint( self.center[0], self.center[1], self.center[2])		      
+	
         
     def plotObjFile(self,fame):
         
@@ -508,7 +618,12 @@ class vtkMeshWidget ():
         return pickedCellId,p3D
 
   
-
+    def addLabelingPanel(self,listLabels):    
+			    
+	    self. labellingPanel=labellingPanelWidget(listLabels)
+	    
+	    self.gridlayout.addWidget(self. labellingPanel, 0, 1)		
+    
 
 
 
@@ -520,7 +635,7 @@ class Example(QtGui.QMainWindow):
 
 
         self.viewWidget = vtkMeshWidget(self)
-
+	self.viewWidget.addLabelingPanel(["roof","floor"])
 
         self.statusBar()
 
