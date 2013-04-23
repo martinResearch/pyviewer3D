@@ -417,7 +417,7 @@ class vtkMeshWidget ():
 	#self.ren.AddActor(edge_actor)
 	
 	### Avoid z-buffer fighting
-	#vtk.vtkPolyDataMapper().SetResolveCoincidentTopologyToPolygonOffset()	
+	vtk.vtkPolyDataMapper().SetResolveCoincidentTopologyToPolygonOffset()	
 	
 	
 	if self.ren.GetActors().GetNumberOfItems()==1:
@@ -428,7 +428,9 @@ class vtkMeshWidget ():
         self.renWin.Render()
 	
     def plotPolyLines(self,listPolyLines):
-		
+		# if the purpose is to display edges of polygons on top of the rendered polygon 
+	        # this mighr not work very well due to z buffer conflicts
+	        # coudl have a looek at http://cgg-journal.com/2008-2/06/index.html
 		
 		vtk_points = vtk.vtkPoints()
 		vtk_lines = vtk.vtkCellArray()
@@ -481,7 +483,7 @@ class vtkMeshWidget ():
 		
 		
 		### Avoid z-buffer fighting
-		vtk.vtkPolyDataMapper().SetResolveCoincidentTopologyToPolygonOffset()	
+		vtk.vtkPolyDataMapper().SetResolveCoincidentTopologyToPolygonOffset()# polygon offSet parameters are shared by all the mappers	
 		
 		
 		if self.ren.GetActors().GetNumberOfItems()==1:
