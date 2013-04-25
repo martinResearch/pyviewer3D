@@ -4,6 +4,7 @@
 # At the moment only v and f keywords are supported
 
 import generic
+import os
 
 modeR = 'r'
 modeW = 'w'
@@ -27,12 +28,68 @@ class reader(generic.reader):
 					yield generic.node(coord[0], coord[1], coord[2], label=str(nodeCounter))
 		except IOError:
 			return
+	def readMaterials(self):
+		# look for the line starting with mtllib 
+		self.f.seek(0)
+		try:
+			while True:
+				line = self.getline()	
+				if line.startswith("mtllib"):
+					fields = line.split()					
+					materialsFileName=fields[1]	
+					materialsFileName=os.path.join(os.path.dirname(self.f.name),materialsFileName)
+					break
+		except IOError:
+			return						
+			
+		
+			
+		self.materialsDict={}
+		material_name=''
+		with open(materialsFileName,'r') as fm:
+			       
+			
+				for line in fm:
+					line.strip()					
+					
+					
+					if line.startswith("#"):
+						pass
+					elif line.startswith("newmtl"):
+						fields = line.split()
+						fields.pop(0)
+						
+						if material_name!='':
+							self.materialsDict[material_name]=material						
+						material_name=fields[0]
+						if self.materialsDict.has_key(material_name):
+							print "material "+material_name+" already defined"
+							raise
+						material={}
+						material['id']=len(self.materialsDict)
+						
+						
+					else :	
+						fields = line.split()
+						attrname=fields.pop(0)	
+						if attrname in ['Kd','Ka','Ks','Tr','d','D']:
+							material[attrname]=[float(f) for f in fields]
+						elif attrname in ['Ns']:      
+							material[attrname]=[int(f) for f in fields]			
+				self.materialsDict[material_name]=material		
+					
+			
 
 	def readElementIndexed(self):
 		"Gets next element"
 		self.f.seek(0)
 		elementCounter = 0
 		nodeCounter = 0
+		self.materialsDict={}	
+		materialId=0
+		if len(self.materialsDict)==0:
+			self.readMaterials()
+		
 		try:
 			while True:
 				line = self.getline()
@@ -54,7 +111,15 @@ class reader(generic.reader):
 							f=str(nodeCounter+int(f))
 						cleanedFields.append(f)
 					
-					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter))
+					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter),materialId=materialId)
+				elif line.startswith("usemtl"):
+					fields = line.split()					
+					materialStr=fields[1]					
+					materialId=self.materialsDict[materialStr]['id']					
+					
+					
+				
+				
 		except IOError:
 			return
 

@@ -277,7 +277,7 @@ class vtkMeshWidget ():
                 vtk_colors.InsertNextTuple3(255,255,255 )
             cell += 1
 	
-        self.sceneWidth=max(box[:,1]-box[:,0])
+        self.sceneWidth=max(self.box[:,1]-self.box[:,0])
 
 
 
@@ -427,7 +427,7 @@ class vtkMeshWidget ():
 	self.refreshCuttingPLanes()
         self.renWin.Render()
 	
-    def plotPolyLines(self,listPolyLines):
+    def plotPolyLines(self,listPolyLines,color=[0,0,0]):
 		# if the purpose is to display edges of polygons on top of the rendered polygon 
 	        # this mighr not work very well due to z buffer conflicts
 	        # coudl have a looek at http://cgg-journal.com/2008-2/06/index.html
@@ -472,11 +472,11 @@ class vtkMeshWidget ():
 		actor.SetMapper(mapper)
 		
 		#actor.GetProperty().SetOpacity(0.7) need to do depth sorting : http://code.google.com/p/pythonxy/source/browse/src/python/vtk/DOC/Examples/VisualizationAlgorithms/DepthSort.py?name=v2.6.6.0&r=001d041959c95a363f4f247643ce759a0a2eb1f6
-		actor.GetProperty().SetLineWidth( 1)		
+		#actor.GetProperty().SetLineWidth( 1)		
 		
-		actor.GetProperty().EdgeVisibilityOn();
-		actor.GetProperty().SetEdgeColor(1,0,0);	
-		actor.GetProperty().SetColor( 1, 0., 0 )
+		actor.GetProperty().EdgeVisibilityOff()
+		actor.GetProperty().SetEdgeColor(color[0], color[1], color[1])
+		actor.GetProperty().SetColor( color[0], color[1], color[1] )
 	
 		self.ren.AddActor(actor)
 		
@@ -670,7 +670,7 @@ class Example(QtGui.QMainWindow):
             
         faces=[]        
         for t in r.readElementIndexed():
-            faces.append([int(iv)-1 for iv in t.list])
+            faces.append([int(iv) for iv in t.list])
            
         
 

@@ -1,10 +1,12 @@
-adding antialisaing , seems tricky :         
+adding antialisaing on the polgon borders, seems tricky :         
 	http://www.vtk.org/pipermail/vtkusers/2008-November/098417.html   
     http://www.vtk.org/pipermail/vtkusers/2008-November/098415.html
-a strange thing is that if i display edges of the triangle , then edges segment are then antialiased
+a strange thing is that if i display edges of the triangle in a different color, then edges segment are  antialiased
 	
 make the cutting plane panel removable
 
-display edges only on the edges on the polygon , not on edges btween two triangles part of the same polygon
+display edges only on the edges on the polygon , not on edges between two triangles part of the same polygon
 	vtk has polygons ("The polygons cannot have any internal holes"  http://www.vtk.org/doc/release/5.0/html/a01894.html) but does not wllow holes in the polygon....
 	will have to create polyline actors : http://www.vtk.org/doc/release/5.0/html/a01895.html
+	
+writing a new camera interaction style that keeps the horizon line horizontal (or vertical of the model vetical)
