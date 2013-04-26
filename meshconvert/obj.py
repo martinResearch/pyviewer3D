@@ -35,8 +35,8 @@ class reader(generic.reader):
 			while True:
 				line = self.getline()	
 				if line.startswith("mtllib"):
-					fields = line.split()					
-					materialsFileName=fields[1]	
+								
+					materialsFileName=line[6:].strip()	
 					materialsFileName=os.path.join(os.path.dirname(self.f.name),materialsFileName)
 					break
 		except IOError:
@@ -46,39 +46,40 @@ class reader(generic.reader):
 			
 		self.materialsDict={}
 		material_name=''
-		with open(materialsFileName,'r') as fm:
-			       
-			
-				for line in fm:
-					line.strip()					
-					
-					
-					if line.startswith("#"):
-						pass
-					elif line.startswith("newmtl"):
-						fields = line.split()
-						fields.pop(0)
-						
-						if material_name!='':
-							self.materialsDict[material_name]=material						
-						material_name=fields[0]
-						if self.materialsDict.has_key(material_name):
-							print "material "+material_name+" already defined"
-							raise
-						material={}
-						material['id']=len(self.materialsDict)
+		try:
+			with open(materialsFileName,'r') as fm:
+				       
+				
+					for line in fm:
+						line.strip()					
 						
 						
-					else :	
-						fields = line.split()
-						attrname=fields.pop(0)	
-						if attrname in ['Kd','Ka','Ks','Tr','d','D']:
-							material[attrname]=[float(f) for f in fields]
-						elif attrname in ['Ns']:      
-							material[attrname]=[int(f) for f in fields]			
-				self.materialsDict[material_name]=material		
-					
-			
+						if line.startswith("#"):
+							pass
+						elif line.startswith("newmtl"):
+							fields = line.split()
+							fields.pop(0)
+							
+							if material_name!='':
+								self.materialsDict[material_name]=material						
+							material_name=fields[0]
+							if self.materialsDict.has_key(material_name):
+								print "material "+material_name+" already defined"
+								raise
+							material={}
+							material['id']=len(self.materialsDict)
+							
+							
+						else :	
+							fields = line.split()
+							attrname=fields.pop(0)	
+							if attrname in ['Kd','Ka','Ks','Tr','d','D']:
+								material[attrname]=[float(f) for f in fields]
+							elif attrname in ['Ns']:      
+								material[attrname]=[int(f) for f in fields]			
+					self.materialsDict[material_name]=material		
+		except IOError:
+			return	
 
 	def readElementIndexed(self):
 		"Gets next element"
@@ -114,12 +115,15 @@ class reader(generic.reader):
 					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter),materialId=materialId)
 				elif line.startswith("usemtl"):
 					fields = line.split()					
-					materialStr=fields[1]					
-					materialId=self.materialsDict[materialStr]['id']					
-					
-					
-				
-				
+					materialStr=fields[1]	
+					if materialStr!='(null)':
+						if not(self.materialsDict.has_key(materialStr)):	# add this material						
+							self.materialsDict[materialStr]={'id':len(self.materialsDict),'Kd':[1,1,1]}
+							print 'material '+materialStr+ ' not found in the materials file'
+						materialId=self.materialsDict[materialStr]['id']
+						
+					else:
+						materialId=0
 		except IOError:
 			return
 

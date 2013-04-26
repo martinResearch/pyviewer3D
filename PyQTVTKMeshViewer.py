@@ -107,6 +107,7 @@ class vtkMeshWidget ():
         self.renWin.AddRenderer(self.ren)
         self.iren = self.renWin.GetInteractor()
         self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+	
         self.iren.AddObserver("MiddleButtonPressEvent", self.MiddleButtonEvent)
         self.iren.AddObserver("KeyPressEvent", self.Keypressed)
         #self.iren.AddObserver("KeyReleaseEvent", self.Keypressed)
@@ -122,9 +123,14 @@ class vtkMeshWidget ():
         self.lastPickedPoint=[]
 	self.box=numpy.zeros(shape=(3,2),dtype=float)
 	self.box[:,0]=numpy.inf
-	self.box[:,1]=-numpy.inf	
+	self.box[:,1]=-numpy.inf
 	
-
+    def SetInteractorStyle(self,style):
+	if style=='Terrain':
+	    self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
+	elif style=='TrackballCamera':
+	     self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+	
     def MiddleButtonEvent(self,obj, event):         
         (x,y) = self.iren.GetEventPosition()
         self.renWin.Render()
@@ -475,7 +481,7 @@ class vtkMeshWidget ():
 		#actor.GetProperty().SetLineWidth( 1)		
 		
 		actor.GetProperty().EdgeVisibilityOff()
-		actor.GetProperty().SetEdgeColor(color[0], color[1], color[1])
+		actor.GetProperty().SetEdgeColor(1, 0,0)
 		actor.GetProperty().SetColor( color[0], color[1], color[1] )
 	
 		self.ren.AddActor(actor)
