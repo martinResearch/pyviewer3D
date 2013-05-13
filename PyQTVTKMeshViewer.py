@@ -73,13 +73,10 @@ class labellingPanelWidget(QtGui.QWidget):
 		    if bIsFirst:
 			    radio.setChecked(True)
 			    bIsFirst = False
-		    vbox.addWidget(radio) 		
-		
-		
-		
-	      
-	      
+		    vbox.addWidget(radio) 
 		self.setLayout(vbox)    
+		
+
 	
 class vtkMeshWidget ():
     def __init__(self,MainWindow):
@@ -324,9 +321,9 @@ class vtkMeshWidget ():
         self.renWin.Render()
         
         
-    def plotSurface(self,points,faces,faceColors=[]):
+    def plotSurface(self,points,faces,faceColors=[]):        
         
-        self.faces=faces   
+        
         vtk_points = vtk.vtkPoints()
         vtk_verts = vtk.vtkCellArray()
         vtk_triangles = vtk.vtkCellArray()
