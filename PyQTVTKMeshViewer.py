@@ -129,7 +129,7 @@ class vtkMeshWidget ():
 	if style=='Terrain':
 	    self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
 	elif style=='TrackballCamera':
-	     self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+	    self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
 	
     def MiddleButtonEvent(self,obj, event):         
         (x,y) = self.iren.GetEventPosition()
