@@ -51,13 +51,14 @@ class node(object):
 		return self.x == that.x and self.y == that.y and self.z == that.z and self.label == that.label and self.color == that.color
 
 class indexedElement(object):
-	def __init__(self, type, list, label='1', color='0',materialId=0):
+	def __init__(self, type, list, label='1', color='0',materialId=0,groupId=-1):
 		"Indexed mesh element.  Vertex indices start from 1"
 		self.type = type
 		self.list = list
 		self.label = label
 		self.color = color
 		self.materialId=materialId
+		self.groupId=groupId
 		if logger.isEnabledFor(logging.DEBUG):
 			logger.debug("found element label=%s (%s) color=%s" % (self.label, ",".join(self.list), self.color))
 

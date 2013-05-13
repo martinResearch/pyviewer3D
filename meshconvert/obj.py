@@ -88,6 +88,8 @@ class reader(generic.reader):
 		nodeCounter = 0
 		self.materialsDict={}	
 		materialId=0
+		groupId=-1
+		self.groupNames=[]
 		if len(self.materialsDict)==0:
 			self.readMaterials()
 		
@@ -112,7 +114,10 @@ class reader(generic.reader):
 							f=str(nodeCounter+int(f))
 						cleanedFields.append(f)
 					
-					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter),materialId=materialId)
+					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter),materialId=materialId,groupId=groupId)
+				elif line.startswith("g"):					
+					groupId+=1
+					self.groupNames.append(line[2:].strip())
 				elif line.startswith("usemtl"):
 					fields = line.split()					
 					materialStr=fields[1]	
