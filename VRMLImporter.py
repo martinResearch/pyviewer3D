@@ -9,7 +9,7 @@ renWin = vtk.vtkRenderWindow()
 renWin.AddRenderer(ren1)
 importer = vtk.vtkVRMLImporter()
 importer.SetRenderWindow(renWin)
-importer.SetFileName("" + str(VTK_DATA_ROOT) + "/Data/bot2.wrl")
+importer.SetFileName("X:/data/models alexandre/MAQUETTES_3/LcG.wrl")
 importer.Read()
 iren = vtk.vtkRenderWindowInteractor()
 iren.SetRenderWindow(renWin)
@@ -35,4 +35,6 @@ ren1.ResetCameraClippingRange()
 # render the image
 #
 iren.Initialize()
+iren.Start()
+
 # --- end of script --
