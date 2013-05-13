@@ -111,7 +111,7 @@ class reader(generic.reader):
 					for f in fields: 
 						f=f.split('/')[0]
 						if f[0]=='-':
-							f=str(nodeCounter+int(f))
+							f=str(nodeCounter+int(f)+1)
 						cleanedFields.append(f)
 					
 					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter),materialId=materialId,groupId=groupId)
