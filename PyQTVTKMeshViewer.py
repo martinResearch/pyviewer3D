@@ -121,6 +121,7 @@ class vtkMeshWidget ():
 	self.box=numpy.zeros(shape=(3,2),dtype=float)
 	self.box[:,0]=numpy.inf
 	self.box[:,1]=-numpy.inf
+	self.boxWithOffset=numpy.zeros(shape=(3,2),dtype=float)
 	
     def SetInteractorStyle(self,style):
 	if style=='Terrain':
@@ -131,9 +132,9 @@ class vtkMeshWidget ():
     def MiddleButtonEvent(self,obj, event):         
         (x,y) = self.iren.GetEventPosition()
         self.renWin.Render()
-        idcell,point=self.pickCell(x,y)
+        idcell,point,idactor=self.pickCell(x,y)
         if idcell!=[]:
-            print 'picked cell '+str(idcell)         
+            print 'picked cell '+str(idcell) + 'on actor '+ str(idactor)        
             self.lastPickedPoint=point
 
     def Keypressed(self,obj, event):
@@ -320,7 +321,10 @@ class vtkMeshWidget ():
 	self.refreshCuttingPLanes()
         self.renWin.Render()
         
-        
+    def updateBoxWithOffset(self):
+	self.boxWithOffset[:,0]=self.box[:,0]-1e-5
+	self.boxWithOffset[:,1]=self.box[:,1]+1e-5  
+	
     def plotSurface(self,points,faces,faceColors=[]):        
         
         
@@ -340,6 +344,8 @@ class vtkMeshWidget ():
             self.box[:,0]=numpy.minimum(self.box[:,0],p)
             self.box[:,1]=numpy.maximum(self.box[:,1],p)
             vtk_points.InsertNextPoint(p[0],p[1],p[2])
+	    
+	self.updateBoxWithOffset()
             
         for idf,f in enumerate(faces):
             # inspired from http://stackoverflow.com/questions/7548966/how-to-display-only-triangle-boundaries-on-textured-surface-in-vtk
@@ -429,6 +435,7 @@ class vtkMeshWidget ():
 	self.resetCuttingPlanes()
 	self.refreshCuttingPLanes()
         self.renWin.Render()
+	return actor.GetAddressAsString(None)
 	
     def plotPolyLines(self,listPolyLines,color=[0,0,0]):
 		# if the purpose is to display edges of polygons on top of the rendered polygon 
@@ -529,17 +536,17 @@ class vtkMeshWidget ():
 	pass
 	v1=1-float(value)/1000
 	v2=float(value)/1000
-	self.cuttingPlaneX.SetOrigin(self.box[0,0]*v1+self.box[0,1]*v2, 0, 0)	
+	self.cuttingPlaneX.SetOrigin(self.boxWithOffset[0,0]*v1+self.boxWithOffset[0,1]*v2, 0, 0)	
 	self.renWin.Render() #seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
     def setYCuttingPlane(self,value):
 	v1=1-float(value)/1000
 	v2=float(value)/1000	
-	self.cuttingPlaneY.SetOrigin(0, self.box[1,0]*v1+self.box[1,1]*v2, 0)
+	self.cuttingPlaneY.SetOrigin(0, self.boxWithOffset[1,0]*v1+self.boxWithOffset[1,1]*v2, 0)
 	self.renWin.Render()#seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
     def setZCuttingPlane(self,value):
 	v1=1-float(value)/1000
 	v2=float(value)/1000	
-	self.cuttingPlaneZ.SetOrigin(0, 0, self.box[2,0]*v1+self.box[2,1]*v2)  
+	self.cuttingPlaneZ.SetOrigin(0, 0, self.boxWithOffset[2,0]*v1+self.boxWithOffset[2,1]*v2)  
 	self.renWin.Render()#seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
 	
     def refreshCuttingPLanes(self):
@@ -600,7 +607,7 @@ class vtkMeshWidget ():
             p=cellPicker.GetPickedPositions()
             p3D=p.GetPoint(0)
             
-            #actor=cellPicker.GetActor()
+            pickedActorId=cellPicker.GetActor().GetAddressAsString(None)
             #cells=actor.GetMapper().GetInput().GetPolys()
             #cellsData=cells=actor.GetMapper().GetInput().GetCellData()
             #idList = vtk.vtkIdList()
@@ -618,9 +625,9 @@ class vtkMeshWidget ():
         else:
             pickedCellId=[]
             p3D=[]
-            
+            pickedActorId=[]
        
-        return pickedCellId,p3D
+        return pickedCellId,p3D,pickedActorId
 
   
     def addLabelingPanel(self,listLabels):    
