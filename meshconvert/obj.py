@@ -109,9 +109,9 @@ class reader(generic.reader):
 					# in some obj faces are defined as -70//-70 -69//-69 -62//-62 
 					cleanedFields=[]
 					for f in fields: 
-						f=f.split('/')[0]
+						f=str(int(f.split('/')[0])-1)
 						if f[0]=='-':
-							f=str(nodeCounter+int(f)+1)
+							f=str(nodeCounter+int(f))
 						cleanedFields.append(f)
 					
 					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter),materialId=materialId,groupId=groupId)

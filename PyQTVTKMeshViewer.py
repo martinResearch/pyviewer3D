@@ -34,22 +34,24 @@ class CutingPlanesWidget(QtGui.QWidget):
     def __init__(self,viewWidget):
 	    super(CutingPlanesWidget, self).__init__()
 	    vbox = QtGui.QVBoxLayout()  
-	    xSlider = self.createSlider(viewWidget.setXCuttingPlane)
-	    ySlider = self.createSlider(viewWidget.setYCuttingPlane)
-	    zSlider = self.createSlider(viewWidget.setZCuttingPlane)
-	    vbox.addWidget(xSlider) 
-	    vbox.addWidget(ySlider) 
-	    vbox.addWidget(zSlider) 
+	    self.xSlider = self.createSlider(viewWidget.setXCuttingPlane)
+	    self.ySlider = self.createSlider(viewWidget.setYCuttingPlane)
+	    self.zSlider = self.createSlider(viewWidget.setZCuttingPlane)
+	    vbox.addWidget(self.xSlider) 
+	    vbox.addWidget(self.ySlider) 
+	    vbox.addWidget(self.zSlider) 
 	    self.setLayout(vbox)
 	   
 	    
     def createSlider(self, setterSlot): # coied from grbber.py example from pyside
 	    slider = QtGui.QSlider(QtCore.Qt.Horizontal)
-	    slider.setRange(0, 1000)
+	    maxrange=1000
+	    slider.setRange(0, maxrange)
 	    slider.setSingleStep(10)
 	    slider.setPageStep(10)
 	    slider.setTickInterval(100)
-	    slider.setTickPosition(QtGui.QSlider.TicksRight)    
+	    slider.setTickPosition(QtGui.QSlider.TicksRight)
+	    slider.setValue(maxrange)
 	    slider.valueChanged.connect(setterSlot)
 	    #changedSignal.connect(slider.setValue)
 	
@@ -82,14 +84,29 @@ class vtkMeshWidget ():
     def __init__(self,MainWindow):
 
         self.centralWidget = QtGui.QWidget(MainWindow)
-        self.vtkWidget = QVTKRenderWindowInteractor(self.centralWidget)  
+         
         self.gridlayout = QtGui.QGridLayout(self.centralWidget)
         self.gridlayout.setMargin(0)
-        self.gridlayout.addWidget(self.vtkWidget, 0, 0)
+	single_window=True # true does not work on linux , not sure why
+	if single_window:
+	    self.vtkWidget = QVTKRenderWindowInteractor(self.centralWidget) 	
+	    self.gridlayout.addWidget(self.vtkWidget, 0, 0)
+	    MainWindow.statusBar() # for some reason this line is necessary to avoid a silent crash on linux when executing self.renWin.Render()
+	else:
+	    self.vtkWidget = QVTKRenderWindowInteractor()  
+	    self.vtkWidget.show()
+	
         self.cutingPlanesWidget=CutingPlanesWidget(self)
         self.gridlayout.addWidget(self.cutingPlanesWidget, 1, 0)
         MainWindow.setCentralWidget(self.centralWidget)
-        self.renWin= self.vtkWidget.GetRenderWindow()       
+	
+	
+	
+	
+
+	
+	
+        self.renWin= self.vtkWidget.GetRenderWindow()  
         self.renWin.PolygonSmoothingOn() 
         self.renWin.LineSmoothingOn()        
         self.renWin.PointSmoothingOn()
@@ -103,25 +120,33 @@ class vtkMeshWidget ():
         self.ren = vtk.vtkRenderer()
         self.renWin.AddRenderer(self.ren)
         self.iren = self.renWin.GetInteractor()
-        self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+		
 	
+	self.iren.SetRenderWindow(self.renWin)
+        self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())	
         self.iren.AddObserver("MiddleButtonPressEvent", self.MiddleButtonEvent)
         self.iren.AddObserver("KeyPressEvent", self.Keypressed)
-        #self.iren.AddObserver("KeyReleaseEvent", self.Keypressed)
-        self.iren .Initialize()
-        self.renWin.Render()
-        self.iren.Start()    
+        self.iren.AddObserver("KeyReleaseEvent", self.Keypressed)
+	
+	
+	self.iren.Initialize()
+	self.renWin.Render()
+        self.iren.Start()   
+	
         self.cuttingPlanesVtk = vtk.vtkPlaneCollection()
 	self.cuttingPlanes=[]
-	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[1,0,0])
-        self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,1,0])
-        self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,1])
+	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[-1,0,0])
+        self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,-1,0])
+        self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,-1])
+	
+	self.renWin.Render()
 	self.box=numpy.array([[0,1],[0,1],[0,1]])
         self.lastPickedPoint=[]
 	self.box=numpy.zeros(shape=(3,2),dtype=float)
 	self.box[:,0]=numpy.inf
 	self.box[:,1]=-numpy.inf
 	self.boxWithOffset=numpy.zeros(shape=(3,2),dtype=float)
+	
 	
     def SetInteractorStyle(self,style):
 	if style=='Terrain':
@@ -138,7 +163,7 @@ class vtkMeshWidget ():
             self.lastPickedPoint=point
 
     def Keypressed(self,obj, event):
-        
+        print "coucou"
         if obj.GetKeyCode()=='c':
             if len(self.lastPickedPoint)>0:
                 self.ren.GetActiveCamera().SetFocalPoint(self.lastPickedPoint[0],self.lastPickedPoint[1],self.lastPickedPoint[2])    
@@ -251,7 +276,7 @@ class vtkMeshWidget ():
 
 
 
-
+ 
 
     def plotPoints(self,points):
         
@@ -266,21 +291,30 @@ class vtkMeshWidget ():
 
        
 
-
-        for point in points:
-            p = point.coord
-            self.box[:,0]=numpy.minimum(self.box[:,0],p)
-            self.box[:,1]=numpy.maximum(self.box[:,1],p)
-            vtk_points.InsertNextPoint(p[0],p[1],p[2])
-            #vtk_verts.InsertNextCell(cell)
-            vtk_verts.InsertNextCell(1)
-            vtk_verts.InsertCellPoint(cell)
-            if len(point.color)>0:
-                vtk_colors.InsertNextTuple3(point.color[0],point.color[1],point.color[2] )
-            else:
-                vtk_colors.InsertNextTuple3(255,255,255 )
-            cell += 1
-	
+	if  isinstance(points[0],Point):
+	    for point in points:
+		p = point.coord
+		self.box[:,0]=numpy.minimum(self.box[:,0],p)
+		self.box[:,1]=numpy.maximum(self.box[:,1],p)
+		vtk_points.InsertNextPoint(p[0],p[1],p[2])
+		#vtk_verts.InsertNextCell(cell)
+		vtk_verts.InsertNextCell(1)
+		vtk_verts.InsertCellPoint(cell)
+		if len(point.color)>0:
+		    vtk_colors.InsertNextTuple3(point.color[0],point.color[1],point.color[2] )
+		else:
+		    vtk_colors.InsertNextTuple3(255,255,255 )
+		cell += 1
+	else: # allow to have points as simple numpy array
+	    for p in points:		
+		self.box[:,0]=numpy.minimum(self.box[:,0],p)
+		self.box[:,1]=numpy.maximum(self.box[:,1],p)
+		vtk_points.InsertNextPoint(p[0],p[1],p[2])
+		#vtk_verts.InsertNextCell(cell)
+		vtk_verts.InsertNextCell(1)
+		vtk_verts.InsertCellPoint(cell)
+		vtk_colors.InsertNextTuple3(255,255,255 )
+		cell += 1	    
         self.sceneWidth=max(self.box[:,1]-self.box[:,0])
 
 
@@ -527,9 +561,10 @@ class vtkMeshWidget ():
         self.renWin.Render()
         
     def resetCuttingPlanes(self):
-	self.setXCuttingPlane(0)
-	self.setYCuttingPlane(0)
-	self.setZCuttingPlane(0)	
+	
+	self.setXCuttingPlane(self.cutingPlanesWidget.xSlider.value())
+	self.setYCuttingPlane(self.cutingPlanesWidget.ySlider.value())
+	self.setZCuttingPlane(self.cutingPlanesWidget.zSlider.value())	
        
       
     def setXCuttingPlane(self,value):
@@ -592,7 +627,7 @@ class vtkMeshWidget ():
         #planeActor.GetProperty().SetLineWidth(2)
         #planeActor.SetMapper(cutterMapper)
         #self.ren.AddActor(planeActor)
-        self.renWin.Render()
+       # self.renWin.Render()
 	return cuttingplane
       
     def pickCell(self,x,y): 
@@ -649,8 +684,10 @@ class Example(QtGui.QMainWindow):
         self.viewWidget = vtkMeshWidget(self)
 	self.viewWidget.addLabelingPanel(["roof","floor"])
 
-        self.statusBar()
-
+	
+        #self.statusBar()
+	
+	
         openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
         openFile.setShortcut('Ctrl+O')
         openFile.setStatusTip('Open new File')
@@ -659,11 +696,11 @@ class Example(QtGui.QMainWindow):
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
         fileMenu.addAction(openFile)
-
+	
         self.setGeometry(300, 300, 350, 300)
-        self.setWindowTitle('File dialog')
+        self.setWindowTitle('File dialog')	
         self.show()
-
+	
     def showDialog(self):
 
         fname = str(QtGui.QFileDialog.getOpenFileName(self, 'Open file',       os.getcwd()))
