@@ -747,23 +747,34 @@ class Example(QtGui.QMainWindow):
 	    points,colors, data=pointCloudIO.loadPCD(fname)
 	    #self.viewWidget.plotPoints(points.reshape((-1,3)))
 	    self.pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
+	    vtkcolors_fields=dict()
+	    
+	    for key in data.keys():
+		if key=='rgb':
+		    vtk_colors=numpyArrayToVtkUnsignedCharArray(colors)	
+		else:
+		    if issubclass(data[key].dtype.type, numpy.integer):
+			colormap=(numpy.random.rand(numpy.max(data[key]+1),3)*255).astype(int)
+			newcolors=colormap[data[key]]
+			vtk_colors =numpyArrayToVtkUnsignedCharArray(newcolors)
+		    else:
+			vtk_colors=[]
+			print 'no yet coded'
+			continue
+		vtkcolors_fields[key]=vtk_colors
+		
+		
 	    
 	    def update_colors(id):
-	       
-		key=data.keys()[id]
-		print 'using '+key+' for coloring the  point cloud'
-		if issubclass(data[key].dtype.type, numpy.integer):
-		    colormap=(numpy.random.rand(numpy.max(data[key]+1),3)*255).astype(int)
-		    colors=colormap[data[key]]
-		    vtk_colors =numpyArrayToVtkUnsignedCharArray(colors)
-		else:
-		    print 'no yet coded'
 	    
 		mapper=self.pointsActor.GetMapper()
 		poly=mapper.GetInput()
-		poly.GetPointData().SetScalars(vtk_colors)
+		key=vtkcolors_fields.keys()[id]
+		if vtkcolors_fields[key]!=[]:
+		    poly.GetPointData().SetScalars(vtkcolors_fields[key])
+		    self.viewWidget.renWin.Render()
 	    
-	    self.viewWidget.addLabelingPanel(data.keys(),update_colors)
+	    self.viewWidget.addLabelingPanel(vtkcolors_fields.keys(),update_colors)
 	    
 	    
 	else:
