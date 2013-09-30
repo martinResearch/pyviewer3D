@@ -59,26 +59,48 @@ class CutingPlanesWidget(QtGui.QWidget):
 
 
 class labellingPanelWidget(QtGui.QWidget):
-    def __init__(self,listLabels):
+    def __init__(self,listLabels,function):
 		super(labellingPanelWidget, self).__init__()
 		
 		
 		
 		vbox = QtGui.QVBoxLayout()        
-		radioGroup = QtGui.QButtonGroup()        
-		radioGroup.setExclusive(True)        
+		self.radioGroup = QtGui.QButtonGroup(self)        
+		self.radioGroup.setExclusive(True)  
+		
 		bIsFirst=True
 		
 		for i,row in enumerate(listLabels):
 		    radio = QtGui.QRadioButton(row)
-		    radioGroup.addButton(radio, i)
+		    
+		    #radio .toggled.connect(self.callback)
+		    self.radioGroup.addButton(radio, i)
 		    if bIsFirst:
 			    radio.setChecked(True)
 			    bIsFirst = False
 		    vbox.addWidget(radio) 
-		self.setLayout(vbox)    
+		self.function=function
+		self.connect(self.radioGroup,QtCore.SIGNAL("buttonClicked(int)"),self.callback)
+		
+		#radioGroup.buttonClicked[QtGui.QAbstractButton].connect(self.callback) 
+		self.setLayout(vbox) 
+    def callback(self,id):
+	self.function(id)
+	
+		
+		
 		
 
+def numpyArrayToVtkUnsignedCharArray(A):    
+    vtk_array = vtk.vtkUnsignedCharArray()
+    vtk_array.SetNumberOfComponents(3)   
+    cell = 0
+    for i in range(A.shape[0]):		
+	vtk_array.InsertNextTuple3(A[i,0],A[i,1],A[i,2] )
+    return vtk_array
+    
+    
+	
 	
 class vtkMeshWidget ():
     def __init__(self,MainWindow):
@@ -109,7 +131,8 @@ class vtkMeshWidget ():
         self.renWin= self.vtkWidget.GetRenderWindow()  
         self.renWin.PolygonSmoothingOn() 
         self.renWin.LineSmoothingOn()        
-        self.renWin.PointSmoothingOn()
+        self.renWin.PointSmoothingOff()
+	# self.renWin.PointSmoothingOff()# will draw antialiased circles but assuming that the background is black even if there are draxn point or primitive behind
         # it seems that qt disable antialiasing 
         # http://www.vtk.org/pipermail/vtkusers/2008-November/098417.html   
         # http://www.vtk.org/pipermail/vtkusers/2008-November/098415.html
@@ -276,9 +299,9 @@ class vtkMeshWidget ():
 
 
 
- 
+    
 
-    def plotPoints(self,points):
+    def plotPoints(self,points,colors=[]):
         
         # look here for vtk examples in python http://www.vtk.org/Wiki/VTK/Examples/Python
 
@@ -313,8 +336,12 @@ class vtkMeshWidget ():
 		#vtk_verts.InsertNextCell(cell)
 		vtk_verts.InsertNextCell(1)
 		vtk_verts.InsertCellPoint(cell)
-		vtk_colors.InsertNextTuple3(255,255,255 )
-		cell += 1	    
+		if colors==[]:
+		    vtk_colors.InsertNextTuple3(255,255,255 )
+		else :
+		    vtk_colors.InsertNextTuple3(colors[cell,0],colors[cell,1],colors[cell,2] )
+		cell += 1
+		
         self.sceneWidth=max(self.box[:,1]-self.box[:,0])
 
 
@@ -329,7 +356,7 @@ class vtkMeshWidget ():
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInput(poly)
         
-        
+
         
         
 
@@ -339,7 +366,7 @@ class vtkMeshWidget ():
         actor = vtk.vtkActor()
         actor.SetMapper(mapper)
         actor.GetProperty().SetColor( 0., 0., 1. )
-        actor.GetProperty().SetLineWidth( 0)
+        actor.GetProperty().SetLineWidth(0)
         actor.GetProperty().SetRepresentationToPoints
         actor.GetProperty().SetPointSize( 5)
         #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
@@ -350,11 +377,16 @@ class vtkMeshWidget ():
 	
 	if self.ren.GetActors().GetNumberOfItems()==1:
 	    self.recenterCamera()	
-	
+	self.updateBoxWithOffset()
 	self.resetCuttingPlanes()
 	self.refreshCuttingPLanes()
         self.renWin.Render()
         
+        return actor
+    
+    
+    
+    
     def updateBoxWithOffset(self):
 	self.boxWithOffset[:,0]=self.box[:,0]-1e-5
 	self.boxWithOffset[:,1]=self.box[:,1]+1e-5  
@@ -433,7 +465,8 @@ class vtkMeshWidget ():
 	
 	actor.GetProperty().EdgeVisibilityOff();
 	actor.GetProperty().SetEdgeColor(0,0,0);	
-        #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
+        #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work if we use self.renWin.PointSmoothingOff() ,
+	# found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
         # how do we rander disk instead of small square  for the points ?!
        
 
@@ -665,9 +698,9 @@ class vtkMeshWidget ():
         return pickedCellId,p3D,pickedActorId
 
   
-    def addLabelingPanel(self,listLabels):    
+    def addLabelingPanel(self,listLabels,function):    
 			    
-	    self. labellingPanel=labellingPanelWidget(listLabels)
+	    self. labellingPanel=labellingPanelWidget(listLabels,function)
 	    
 	    self.gridlayout.addWidget(self. labellingPanel, 0, 1)		
     
@@ -682,7 +715,7 @@ class Example(QtGui.QMainWindow):
 
 
         self.viewWidget = vtkMeshWidget(self)
-	self.viewWidget.addLabelingPanel(["roof","floor"])
+	
 
 	
         #self.statusBar()
@@ -700,39 +733,73 @@ class Example(QtGui.QMainWindow):
         self.setGeometry(300, 300, 350, 300)
         self.setWindowTitle('File dialog')	
         self.show()
+	self.pointsActor=[]
 	
     def showDialog(self):
 
         fname = str(QtGui.QFileDialog.getOpenFileName(self, 'Open file',       os.getcwd()))
-        inputFormat=meshconvert.getFormat(fname,"garbage")
-        inputModule =  __import__("meshconvert."+inputFormat, globals(),  locals(), [""])
-        file =open(fname ,'r')
-        r=inputModule.reader(file)
-
-        vertices=[]
-        vertexColors=[]
-        for t in r.readNode():
-            vertices.append([float(t.x),float(t.y),float(t.z)])
-            vertexColors.append([float(x)/255 for x in t.color])
-            
-        faces=[]        
-        for t in r.readElementIndexed():
-            faces.append([int(iv) for iv in t.list])
-           
         
-
-        points =[Point(coord,color=color) for coord,color in zip(vertices,vertexColors)]
-        self.viewWidget.plotPoints(points)
-        self.viewWidget.plotSurface(points,faces)
-        #self.viewWidget.plotObjFile (fname)
-        #self.viewWidget.addCuttingPlane([0,0,0],[-1,0,0])
-        #self.viewWidget.getCuttingPlanes()
-        # creat numpy arrays
-        # vertices
-        # normals
-        # faces
-
-        #self.glWidget.loadCollada(fname)
+        
+        suffix = fname[fname.rindex("."):].lower()
+	if suffix=='.pcd':
+	    # this is a point cloud 
+	    import pointCloudIO
+	    points,colors, data=pointCloudIO.loadPCD(fname)
+	    #self.viewWidget.plotPoints(points.reshape((-1,3)))
+	    self.pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
+	    
+	    def update_colors(id):
+	       
+		key=data.keys()[id]
+		print 'using '+key+' for coloring the  point cloud'
+		if issubclass(data[key].dtype.type, numpy.integer):
+		    colormap=(numpy.random.rand(numpy.max(data[key]+1),3)*255).astype(int)
+		    colors=colormap[data[key]]
+		    vtk_colors =numpyArrayToVtkUnsignedCharArray(colors)
+		else:
+		    print 'no yet coded'
+	    
+		mapper=self.pointsActor.GetMapper()
+		poly=mapper.GetInput()
+		poly.GetPointData().SetScalars(vtk_colors)
+	    
+	    self.viewWidget.addLabelingPanel(data.keys(),update_colors)
+	    
+	    
+	else:
+        
+	    inputFormat=meshconvert.getFormat(fname,"garbage")
+	    
+	    
+	    
+	    inputModule =  __import__("meshconvert."+inputFormat, globals(),  locals(), [""])
+	    file =open(fname ,'r')
+	    r=inputModule.reader(file)
+    
+	    vertices=[]
+	    vertexColors=[]
+	    for t in r.readNode():
+		vertices.append([float(t.x),float(t.y),float(t.z)])
+		vertexColors.append([float(x)/255 for x in t.color])
+		
+	    faces=[]        
+	    for t in r.readElementIndexed():
+		faces.append([int(iv) for iv in t.list])
+	       
+	    
+    
+	    points =[Point(coord,color=color) for coord,color in zip(vertices,vertexColors)]
+	    self.viewWidget.plotPoints(points)
+	    self.viewWidget.plotSurface(points,faces)
+	    #self.viewWidget.plotObjFile (fname)
+	    #self.viewWidget.addCuttingPlane([0,0,0],[-1,0,0])
+	    #self.viewWidget.getCuttingPlanes()
+	    # creat numpy arrays
+	    # vertices
+	    # normals
+	    # faces
+    
+	    #self.glWidget.loadCollada(fname)
 
 
 
