@@ -716,14 +716,17 @@ class Example(QtGui.QMainWindow):
 
         self.viewWidget = vtkMeshWidget(self)
 	
-
+        self.viewWidget.SetInteractorStyle('Terrain')
+	
+	self.viewWidget.iren.AddObserver("MouseWheelForwardEvent", self.myWheelCallback)
+	self.viewWidget.iren.AddObserver("MouseWheelBackwardEvent", self.myWheelCallback)
 	
         #self.statusBar()
-	
+
 	
         openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
-        openFile.setShortcut('Ctrl+O')
-        openFile.setStatusTip('Open new File')
+	openFile.setShortcut('Ctrl+O')
+	openFile.setStatusTip('Open new File')
         openFile.triggered.connect(self.showDialog)
 
         menubar = self.menuBar()
@@ -734,7 +737,18 @@ class Example(QtGui.QMainWindow):
         self.setWindowTitle('File dialog')	
         self.show()
 	self.pointsActor=[]
-	
+    def myWheelCallback(self,a,eventName):
+	if self.pointsActor!=[]:
+	    pointSize=self.pointsActor.GetProperty().GetPointSize()
+	    if eventName=='MouseWheelForwardEvent':
+		pointSize=pointSize+1
+	    else: 
+		pointSize=pointSize-1
+		if pointSize<1:
+		    pointSize=1
+	    
+	    mapper=self.pointsActor.GetProperty().SetPointSize( pointSize)
+	    self.viewWidget.renWin.Render()
     def showDialog(self):
 
         fname = str(QtGui.QFileDialog.getOpenFileName(self, 'Open file',       os.getcwd()))
@@ -747,6 +761,7 @@ class Example(QtGui.QMainWindow):
 	    points,colors, data=pointCloudIO.loadPCD(fname)
 	    #self.viewWidget.plotPoints(points.reshape((-1,3)))
 	    self.pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
+	    
 	    vtkcolors_fields=dict()
 	    
 	    for key in data.keys():
