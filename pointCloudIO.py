@@ -12,26 +12,26 @@ def savePTX(transform,points,filename):
 		np.savetxt(f,transform.get_translation().reshape([1,3]),'%.5f')
 		for p in points.reshape([-1,3]):
 			np.savetxt(f,np.hstack((p,np.array([1,127,127,127]))).reshape([1,7]),'%.5f %.5f %.5f %d %d %d %d')
-			
+
 def loadPTX(filename):
 	with open(filename, 'r') as f:
-		
+
 		nblines=int(f.readline())
 
 		nbcols=int(f.readline())
 		print nblines
-		print nbcols		
+		print nbcols
 		points=np.empty((nblines,nbcols))
-		#np.loadtxt does not allow yet to specify a number of rows, np ticket 1731. 
+		#np.loadtxt does not allow yet to specify a number of rows, np ticket 1731.
 		#http://np-discussion.10968.n7.nabble.com/using-loadtxt-for-given-number-of-rows-td3635.html
-		translation=np.fromfile(f, sep=' ', count=3) 
+		translation=np.fromfile(f, sep=' ', count=3)
 		rotation=np.fromfile(f, sep=' ', count=9).reshape(3,3)
 		print rotation
 		Rt=np.fromfile(f, sep=' ', count=12).reshape(3,4)
-		translation=np.fromfile(f, sep=' ', count=3) 
+		translation=np.fromfile(f, sep=' ', count=3)
 		transform=RigidTransform3D(rotation,translation,fix_rotation=True)
-		points_with_color=np.fromfile(f,  sep=' ',count=-1).reshape(-1,7)		
-		points=points_with_color[:,:3].reshape((nblines,nbcols,3))		
+		points_with_color=np.fromfile(f,  sep=' ',count=-1).reshape(-1,7)
+		points=points_with_color[:,:3].reshape((nblines,nbcols,3))
 		colors=points_with_color[:,4:7].reshape((nblines,nbcols,3)).astype(int)
 		return points, colors , transform
 
@@ -55,7 +55,7 @@ def savePCD(transform,points,filename,idpolys,polygons,idlabelToMaterial,labelCo
 		np.savetxt(f,quaternion.reshape(1,4),'%.5f',newline='')
 		f.write('\n')
 		f.write('POINTS '+str(points.shape[0]*points.shape[1])+'\n')
-		
+
 		for  key, value in idlabelToMaterial.iteritems():
 			f.write('# material '+str(key)+' = '+value+'\n')
 		f.write('DATA ascii\n')
@@ -75,14 +75,14 @@ def savePCD(transform,points,filename,idpolys,polygons,idlabelToMaterial,labelCo
 				assert(rgb_int==rgb_int2)
 				color=[(rgb_int2>>16)& 0x0000ff,(rgb_int2>>8)& 0x0000ff,(rgb_int2)& 0x0000ff]
 				f.write('%.7f'%p[0]+' '+'%.7f'%p[1]+' '+'%.7f'%p[2]+' '+rgb_string+' '+str(label)+' '+str(idpoly)+'\n')
-				
+
 
 def loadPCD(filename):
 	header_dict=dict()
 	with open(filename, 'r') as f:
 		while True:
-			line=f.readline()			
-			line = line.rstrip('\n')	
+			line=f.readline()
+			line = line.rstrip('\n')
 			t=line.split(' ')
 			if t[0][0]=='#':
 				continue
@@ -93,8 +93,8 @@ def loadPCD(filename):
 		#Data=numpy.empty((header_dict['WIDTH'],header_dict['HEIGHT']),dtype=float)
 		nbPoints=int(header_dict['POINTS'][0])
 		DataArray=np.fromfile(f,  sep=' ',count=-1).reshape(nbPoints,-1)
-		
-		
+
+
 		Data=dict()
 		nbFields=len(header_dict['FIELDS'])
 		for i,field,type,size in zip(range(nbFields),header_dict['FIELDS'],header_dict['TYPE'],header_dict['SIZE']):
@@ -102,7 +102,7 @@ def loadPCD(filename):
 				if size=='4':
 					py_type=np.float32
 				else:
-					print 'not coded yet'				
+					print 'not coded yet'
 			elif  type=='U':
 				if size=='4':
 					py_type=np.uint32
@@ -112,18 +112,76 @@ def loadPCD(filename):
 				if size=='4':
 					py_type=np.int32
 				else:
-					print 'not coded yet'				
+					print 'not coded yet'
 			Data[field]=DataArray[:,i].astype(py_type)
-			
+
 		points=np.column_stack ((Data['x'],Data['y'],Data['z']))
-		
+
 		colors=np.empty((nbPoints,3),dtype=np.uint8)
 		from struct import pack,unpack
 		for i,color_float in enumerate(Data['rgb']):
 			rgb_int=unpack('I',pack('f',color_float))[0] # tha does not seem to work , as i do not get the right colors when using pcd_viewer
-			colors[i,:]=[(rgb_int>>16)& 0x0000ff,(rgb_int>>8)& 0x0000ff,(rgb_int)& 0x0000ff]		
+			colors[i,:]=[(rgb_int>>16)& 0x0000ff,(rgb_int>>8)& 0x0000ff,(rgb_int)& 0x0000ff]
+		for key in ['x','y','z','rgb']:
+			del Data[key]
 		return points,colors, Data
 
-		
-if __name__ == "__main__":		
+
+def loadPLY(filename):
+	header_dict=dict()
+	with open(filename, 'r') as f:
+		line=f.readline().rstrip('\n')
+		assert(line=='ply')
+		line=f.readline().rstrip('\n')
+		assert(line=='format ascii 1.0')
+		fields_names=[]
+		fields_types=[]
+		while True:
+			line=f.readline()
+			line = line.rstrip('\n')
+			t=line.split(' ')
+
+			if t[0]=='comment':
+				continue
+			elif t[0]=='end_header':
+				break
+	 		elif t[0]=='property':
+
+				fields_names.append(t[2])
+				fields_types.append(t[1])
+			elif t[0]=='element':
+				if t[1]=='vertex':
+					nbPoints=int(t[2])
+					assert(len(t)==3)
+			else:
+				print 'unkown key word'
+
+
+		DataArray=np.fromfile(f,  sep=' ',count=-1).reshape(nbPoints,-1)
+
+		Data=dict()
+		nbFields=len(fields_names)
+		for i,field,type in zip(range(nbFields),fields_names,fields_types):
+			if type=='float':
+				py_type=np.float32
+			elif  type=='uint':
+				py_type=np.uint32
+			elif  type=='uchar':
+				py_type=np.uint8
+			else:
+				print 'not yet coded'
+				raise
+
+			Data[field]=DataArray[:,i].astype(py_type)
+
+		points=np.column_stack ((Data['x'],Data['y'],Data['z']))
+
+		colors=np.column_stack ((Data['red'],Data['green'],Data['blue']))
+		for key in ['x','y','z','red','green','blue']:
+			del Data[key]
+
+
+		return points,colors, Data
+
+if __name__ == "__main__":
 	points2,colors, transform=loadPCD('scan.pcd')
