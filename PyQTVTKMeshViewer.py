@@ -759,9 +759,10 @@ class Example(QtGui.QMainWindow):
 	    # this is a point cloud
 	    import pointCloudIO
 	    if suffix=='.pcd':
-		points,colors, data=pointCloudIO.loadPCD(fname)
+		points,colors, data,maps=pointCloudIO.loadPCD(fname)
 	    elif suffix=='.ply':
 		points,colors, data=pointCloudIO.loadPLY(fname)
+		maps=dict()
 
 	    #self.viewWidget.plotPoints(points.reshape((-1,3)))
 	    self.pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
@@ -791,6 +792,8 @@ class Example(QtGui.QMainWindow):
 		if vtkcolors_fields[key]!=[]:
 		    poly.GetPointData().SetScalars(vtkcolors_fields[key])
 		    self.viewWidget.renWin.Render()
+		    if maps.has_key(key):
+			pass # should display the legend
 
 	    self.viewWidget.addLabelingPanel(vtkcolors_fields.keys(),update_colors)
 

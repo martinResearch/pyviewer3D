@@ -8,13 +8,13 @@ WIDTH 480
 HEIGHT 100
 VIEWPOINT 5.54790 1.00000 -3.45818 1.00000 0.00000 0.00000 0.00000
 POINTS 48000
-# material 0 = IfcBuildingElementProxy
-# material 1 = IfcDoor
-# material 2 = IfcRoof
-# material 3 = IfcSlab
-# material 4 = IfcStair
-# material 5 = IfcWallStandardCase
-# material 6 = IfcWindow
+# map: Type 0:IfcBuildingElementProxy
+# map: Type 1:IfcDoor
+# map: Type 2:IfcRoof
+# map: Type 3:IfcSlab
+# map: Type 4:IfcStair
+# map: Type 5:IfcWallStandardCase
+# map: Type 6:IfcWindow
 DATA ascii
 0.0000000 0.0000000 0.0000000 2.11127992e-38 5 0
 0.0000000 0.0000000 0.0000000 2.11127992e-38 5 0

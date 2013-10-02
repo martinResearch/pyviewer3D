@@ -79,13 +79,21 @@ def savePCD(transform,points,filename,idpolys,polygons,idlabelToMaterial,labelCo
 
 def loadPCD(filename):
 	header_dict=dict()
+	maps=dict()
 	with open(filename, 'r') as f:
 		while True:
 			line=f.readline()
 			line = line.rstrip('\n')
+			line = line.rstrip('\r')
 			t=line.split(' ')
 			if t[0][0]=='#':
-				continue
+				if t[1]=='map:': # this is not part of the PCD format , but is a custom way to save some information
+					e=t[3].split(':')
+					if not(maps.has_key(t[2])):
+						maps[t[2]]=dict()
+					maps[t[2]][int(e[0])]=e[1]
+				else:
+					continue
 			if t[0]!='DATA':
 				header_dict[t[0]]=t[1:]
 			else :
@@ -95,9 +103,12 @@ def loadPCD(filename):
 		DataArray=np.fromfile(f,  sep=' ',count=-1).reshape(nbPoints,-1)
 
 
+
+
 		Data=dict()
 		nbFields=len(header_dict['FIELDS'])
-		for i,field,type,size in zip(range(nbFields),header_dict['FIELDS'],header_dict['TYPE'],header_dict['SIZE']):
+		col=0
+		for field,type,size,count in zip(header_dict['FIELDS'],header_dict['TYPE'],header_dict['SIZE'],header_dict['COUNT']):
 			if type=='F':
 				if size=='4':
 					py_type=np.float32
@@ -113,9 +124,13 @@ def loadPCD(filename):
 					py_type=np.int32
 				else:
 					print 'not coded yet'
-			Data[field]=DataArray[:,i].astype(py_type)
+			if int(count)>1:
+				Data[field]=DataArray[:,col:col+int(count)].astype(py_type)
+			else:
+				Data[field]=DataArray[:,col].astype(py_type)
+			col+=int(count)
 
-		points=np.column_stack ((Data['x'],Data['y'],Data['z']))
+		points=np.column_stack ((Data['x'],Data['y'],Data['z'])).reshape(int(header_dict['HEIGHT'][0]),int(header_dict['WIDTH'][0]),-1)
 
 		colors=np.empty((nbPoints,3),dtype=np.uint8)
 		from struct import pack,unpack
@@ -124,7 +139,7 @@ def loadPCD(filename):
 			colors[i,:]=[(rgb_int>>16)& 0x0000ff,(rgb_int>>8)& 0x0000ff,(rgb_int)& 0x0000ff]
 		for key in ['x','y','z','rgb']:
 			del Data[key]
-		return points,colors, Data
+		return points,colors, Data,maps
 
 
 def loadPLY(filename):
