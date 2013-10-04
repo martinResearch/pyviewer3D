@@ -80,7 +80,7 @@ def savePCD(transform,points,filename,idpolys,polygons,idlabelToMaterial,labelCo
 def loadPCD(filename):
 	header_dict=dict()
 	maps=dict()
-	with open(filename, 'r') as f:
+	with open(filename, 'rb') as f:
 		while True:
 			line=f.readline()
 			line = line.rstrip('\n')
@@ -94,20 +94,17 @@ def loadPCD(filename):
 					maps[t[2]][int(e[0])]=e[1]
 				else:
 					continue
-			if t[0]!='DATA':
-				header_dict[t[0]]=t[1:]
-			else :
+			if t[0]=='DATA':
+				datatype=t[1]
 				break
+			else :
+				header_dict[t[0]]=t[1:]
+				
 		#Data=numpy.empty((header_dict['WIDTH'],header_dict['HEIGHT']),dtype=float)
 		nbPoints=int(header_dict['POINTS'][0])
-		DataArray=np.fromfile(f,  sep=' ',count=-1).reshape(nbPoints,-1)
-
-
-
-
-		Data=dict()
-		nbFields=len(header_dict['FIELDS'])
-		col=0
+		
+		
+		py_types=[]
 		for field,type,size,count in zip(header_dict['FIELDS'],header_dict['TYPE'],header_dict['SIZE'],header_dict['COUNT']):
 			if type=='F':
 				if size=='4':
@@ -124,20 +121,42 @@ def loadPCD(filename):
 					py_type=np.int32
 				else:
 					print 'not coded yet'
-			if int(count)>1:
-				Data[field]=DataArray[:,col:col+int(count)].astype(py_type)
-			else:
-				Data[field]=DataArray[:,col].astype(py_type)
-			col+=int(count)
+			py_types.append(py_type)		
+		dt = np.dtype(zip(header_dict['FIELDS'],py_types))
+		Data=dict()
+		if datatype=='ascii':
+			DataArray=np.fromfile(f,  sep=' ',count=-1).reshape(nbPoints,-1)
+			
+			nbFields=len(header_dict['FIELDS'])
+			col=0	
+			for field,py_type,count in zip(header_dict['FIELDS'],py_types,header_dict['COUNT']):	
+				if int(count)>1:
+					Data[field]=DataArray[:,col:col+int(count)].astype(py_type)
+				else:
+					Data[field]=DataArray[:,col].astype(py_type)
+				col+=int(count)			
+		elif  datatype=='binary':	
+			DataArray=np.fromfile(f, dtype=dt,count=nbPoints)
+			for key in header_dict['FIELDS']:
+				Data[key]=DataArray[key]
+		elif datatype=='binary_compressed':
+			print 'not yet coded looking at http://www.mathworks.fr/matlabcentral/fileexchange/40382-matlab-to-point-cloud-library/ it seem like it used lzf compression so we could use https://pypi.python.org/pypi/python-lzf'
+			raise
+		else:
+			print 'loading type '+ datatype+' not yet coded'
+			raise
+					
 
 		points=np.column_stack ((Data['x'],Data['y'],Data['z'])).reshape(int(header_dict['HEIGHT'][0]),int(header_dict['WIDTH'][0]),-1)
 
 		colors=np.empty((nbPoints,3),dtype=np.uint8)
 		from struct import pack,unpack
-		for i,color_float in enumerate(Data['rgb']):
-			rgb_int=unpack('I',pack('f',color_float))[0] # tha does not seem to work , as i do not get the right colors when using pcd_viewer
-			colors[i,:]=[(rgb_int>>16)& 0x0000ff,(rgb_int>>8)& 0x0000ff,(rgb_int)& 0x0000ff]
-		for key in ['x','y','z','rgb']:
+		if Data.has_key('rgb'):
+			for i,color_float in enumerate(Data['rgb']):
+				rgb_int=unpack('I',pack('f',color_float))[0] # tha does not seem to work , as i do not get the right colors when using pcd_viewer
+				colors[i,:]=[(rgb_int>>16)& 0x0000ff,(rgb_int>>8)& 0x0000ff,(rgb_int)& 0x0000ff]
+			del Data['rgb']
+		for key in ['x','y','z']:
 			del Data[key]
 		return points,colors, Data,maps
 
@@ -199,4 +218,11 @@ def loadPLY(filename):
 		return points,colors, Data
 
 if __name__ == "__main__":
-	points2,colors, transform=loadPCD('scan.pcd')
+	points,colors, transform,maps=loadPCD('data/scan_ascii.pcd')
+	from matplotlib import pyplot as plt
+	from mpl_toolkits.mplot3d import Axes3D
+	fig = plt.figure()
+	ax = Axes3D(fig)
+	points2=points.reshape(-1,3)
+	ax.scatter(points2[:,0],points2[:,1],points2[:,2],s=20)
+	plt.show()

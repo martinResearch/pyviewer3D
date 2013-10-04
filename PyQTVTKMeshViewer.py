@@ -20,7 +20,6 @@ import os
 import numpy
 import OpenGL.arrays.vbo as glvbo
 
-
 import vtk
 from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
