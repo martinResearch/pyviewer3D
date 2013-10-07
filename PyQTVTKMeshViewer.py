@@ -149,7 +149,7 @@ class vtkMeshWidget ():
         self.iren.AddObserver("MiddleButtonPressEvent", self.MiddleButtonEvent)
         self.iren.AddObserver("KeyPressEvent", self.Keypressed)
         self.iren.AddObserver("KeyReleaseEvent", self.Keypressed)
-
+	
 
 	self.iren.Initialize()
 	self.renWin.Render()
@@ -175,6 +175,8 @@ class vtkMeshWidget ():
 	    self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
 	elif style=='TrackballCamera':
 	    self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
+	else:
+	    self.iren.SetInteractorStyle(style)
 
     def MiddleButtonEvent(self,obj, event):
         (x,y) = self.iren.GetEventPosition()
@@ -704,6 +706,125 @@ class vtkMeshWidget ():
 	    self.gridlayout.addWidget(self. labellingPanel, 0, 1)
 
 
+	   
+	 
+
+
+class MyInteractorStyle(vtk.vtkInteractorStyle):
+    def __init__(self,parent=None):
+    
+	self.AddObserver("LeftButtonPressEvent", self.ButtonEvent)
+	self.AddObserver("LeftButtonReleaseEvent",  self.ButtonEvent)
+	self.AddObserver("MiddleButtonPressEvent",  self.ButtonEvent)
+	self.AddObserver("MiddleButtonReleaseEvent",  self.ButtonEvent)
+	self.AddObserver("RightButtonPressEvent",  self.ButtonEvent)
+	self.AddObserver("RightButtonReleaseEvent",  self.ButtonEvent)
+	self.AddObserver("KeyPressEvent", self.KeyPressedEvent)
+	
+	self.Rotating = 0
+	self.Panning  = 0
+	self.Zooming  = 0
+	self.AddObserver("MouseMoveEvent", self.MouseMoveEvent)
+	   
+		
+    def ButtonEvent(self,obj, event):
+	
+	if event == "LeftButtonPressEvent":
+	    self.Rotating = 1
+	elif event == "LeftButtonReleaseEvent":
+	    self.Rotating = 0
+	elif event == "MiddleButtonPressEvent":
+	    self.Panning = 1
+	elif event == "MiddleButtonReleaseEvent":
+	    self.Panning = 0
+	elif event == "RightButtonPressEvent":
+	    self.Zooming = 1
+	elif event == "RightButtonReleaseEvent":
+	    self.Zooming = 0	
+     
+    def MouseMoveEvent(self,obj,eventName):
+	
+	if self.Rotating or  self.Panning or self.Zooming:
+	    iren = obj.GetInteractor()
+	    renWin=iren.GetRenderWindow()
+	    ren=renWin.GetRenderers().GetFirstRenderer()	
+	    camera=ren.GetActiveCamera()
+	    lastXYpos = iren.GetLastEventPosition()
+	    lastX = lastXYpos[0]
+	    lastY = lastXYpos[1]
+	  
+	    xypos = iren.GetEventPosition()
+	    x = xypos[0]
+	    y = xypos[1]
+	  
+	    center = renWin.GetSize()
+	    centerX = center[0]/2.0
+	    centerY = center[1]/2.0	    
+		  
+	    if self.Rotating: 		
+		
+		camera.Azimuth(lastX-x)
+		camera.Elevation(lastY-y)
+		camera.OrthogonalizeViewUp()	    
+		renWin.Render()		    
+	    
+	    if  self.Panning:
+		FPoint = camera.GetFocalPoint()
+		FPoint0 = FPoint[0]
+		FPoint1 = FPoint[1]
+		FPoint2 = FPoint[2]
+    
+		PPoint = camera.GetPosition()
+		PPoint0 = PPoint[0]
+		PPoint1 = PPoint[1]
+		PPoint2 = PPoint[2]
+    
+		ren.SetWorldPoint(FPoint0, FPoint1, FPoint2, 1.0)
+		ren.WorldToDisplay()
+		DPoint = ren.GetDisplayPoint()
+		focalDepth = DPoint[2]
+    
+		APoint0 = centerX+(x-lastX)
+		APoint1 = centerY+(y-lastY)
+		
+		ren.SetDisplayPoint(APoint0, APoint1, focalDepth)
+		ren.DisplayToWorld()
+		RPoint = ren.GetWorldPoint()
+		RPoint0 = RPoint[0]
+		RPoint1 = RPoint[1]
+		RPoint2 = RPoint[2]
+		RPoint3 = RPoint[3]
+	
+		if RPoint3 != 0.0:
+		    RPoint0 = RPoint0/RPoint3
+		    RPoint1 = RPoint1/RPoint3
+		    RPoint2 = RPoint2/RPoint3
+	    
+		camera.SetFocalPoint( (FPoint0-RPoint0)/2.0 + FPoint0,
+			              (FPoint1-RPoint1)/2.0 + FPoint1,
+			              (FPoint2-RPoint2)/2.0 + FPoint2)
+		camera.SetPosition( (FPoint0-RPoint0)/2.0 + PPoint0,
+			            (FPoint1-RPoint1)/2.0 + PPoint1,
+			            (FPoint2-RPoint2)/2.0 + PPoint2)
+		renWin.Render()
+	    if  self.Zooming:
+		dollyFactor = pow(1.02,(0.5*(y-lastY)))
+		if camera.GetParallelProjection():
+		    parallelScale = camera.GetParallelScale()*dollyFactor
+		    camera.SetParallelScale(parallelScale)
+		else:
+		    camera.Dolly(dollyFactor)
+		    ren.ResetCameraClippingRange()
+	    
+		renWin.Render()     
+	
+    def KeyPressedEvent(self,obj,eventName):
+        iren = obj.GetInteractor()
+        key = iren.GetKeyCode()
+	print "pressed key "+  key
+	pass	
+    
+
 
 
 
@@ -715,18 +836,21 @@ class Example(QtGui.QMainWindow):
 
         self.viewWidget = vtkMeshWidget(self)
 
-        self.viewWidget.SetInteractorStyle('Terrain')
+	
 
+        self.viewWidget.SetInteractorStyle(MyInteractorStyle())
+	#self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
 	self.viewWidget.iren.AddObserver("MouseWheelForwardEvent", self.myWheelCallback)
 	self.viewWidget.iren.AddObserver("MouseWheelBackwardEvent", self.myWheelCallback)
-
+	#self.viewWidget.iren.AddObserver("InteractionEvent", self.myInteractionCallback)
+	
         #self.statusBar()
 
 
         openFile = QtGui.QAction(QtGui.QIcon('open.png'), 'Open', self)
 	openFile.setShortcut('Ctrl+O')
 	openFile.setStatusTip('Open new File')
-        openFile.triggered.connect(self.showDialog)
+        openFile.triggered.connect(self.openFileGui)
 
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&File')
@@ -735,10 +859,16 @@ class Example(QtGui.QMainWindow):
         self.setGeometry(300, 300, 350, 300)
         self.setWindowTitle('File dialog')
         self.show()
-	self.pointsActor=[]
+	
+	self.pointClouds=[]
+	
+
+	
     def myWheelCallback(self,a,eventName):
-	if self.pointsActor!=[]:
-	    pointSize=self.pointsActor.GetProperty().GetPointSize()
+	if self.pointClouds!=[]:
+	    for pointCloud in self.pointClouds:
+		pointsActor=pointCloud['pointsActor']
+		pointSize=pointsActor.GetProperty().GetPointSize()
 	    if eventName=='MouseWheelForwardEvent':
 		pointSize=pointSize+1
 	    else:
@@ -746,25 +876,33 @@ class Example(QtGui.QMainWindow):
 		if pointSize<1:
 		    pointSize=1
 
-	    mapper=self.pointsActor.GetProperty().SetPointSize( pointSize)
+	    mapper=pointsActor.GetProperty().SetPointSize( pointSize)
 	    self.viewWidget.renWin.Render()
-    def showDialog(self):
+	    
+	    
+	    
+    def openFileGui(self):
 
         fname = str(QtGui.QFileDialog.getOpenFileName(self, 'Open file',       os.getcwd()))
-
+	self.openFile(fname)
+	
+    def openFile(self,fname):
 
         suffix = fname[fname.rindex("."):].lower()
 	if suffix=='.pcd' or suffix=='.ply':
 	    # this is a point cloud
 	    import pointCloudIO
 	    if suffix=='.pcd':
-		points,colors, data,maps=pointCloudIO.loadPCD(fname)
+		points,colors, data,maps=pointCloudIO.loadPCD(fname,default_color=(numpy.random.rand(3)*200+50).astype(int))
 	    elif suffix=='.ply':
 		points,colors, data=pointCloudIO.loadPLY(fname)
 		maps=dict()
 
 	    #self.viewWidget.plotPoints(points.reshape((-1,3)))
-	    self.pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
+	    
+	    
+	   
+	    pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
 
 	    vtkcolors_fields=dict()
 
@@ -780,7 +918,9 @@ class Example(QtGui.QMainWindow):
 			print 'no yet coded'
 			continue
 		    vtkcolors_fields[key]=vtk_colors
-
+	    pointCloud={'pointsActor': pointsActor,'vtkcolors_fields':vtkcolors_fields}
+	    self.pointClouds.append(pointCloud)
+	    self.viewWidget.recenterCamera()
 
 
 	    def update_colors(id):
@@ -839,6 +979,8 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene22_m1.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
     sys.exit(app.exec_())
 
 
