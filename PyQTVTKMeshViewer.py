@@ -117,8 +117,8 @@ class vtkMeshWidget ():
 	    self.vtkWidget = QVTKRenderWindowInteractor()
 	    self.vtkWidget.show()
 
-        self.cutingPlanesWidget=CutingPlanesWidget(self)
-        self.gridlayout.addWidget(self.cutingPlanesWidget, 1, 0)
+        
+        self.cuttingPlanes=[]
         MainWindow.setCentralWidget(self.centralWidget)
 
 
@@ -155,11 +155,7 @@ class vtkMeshWidget ():
 	self.renWin.Render()
         self.iren.Start()
 
-        self.cuttingPlanesVtk = vtk.vtkPlaneCollection()
-	self.cuttingPlanes=[]
-	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[-1,0,0])
-        self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,-1,0])
-        self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,-1])
+
 
 	self.renWin.Render()
 	self.box=numpy.array([[0,1],[0,1],[0,1]])
@@ -169,7 +165,14 @@ class vtkMeshWidget ():
 	self.box[:,1]=-numpy.inf
 	self.boxWithOffset=numpy.zeros(shape=(3,2),dtype=float)
 
-
+    def AddCuttingPlanesWidget(self):
+	self.cutingPlanesWidget=CutingPlanesWidget(self)
+	self.gridlayout.addWidget(self.cutingPlanesWidget, 1, 0)
+        self.cuttingPlanesVtk = vtk.vtkPlaneCollection()
+	
+	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[-1,0,0])
+	self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,-1,0])
+	self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,-1])		
     def SetInteractorStyle(self,style):
 	if style=='Terrain':
 	    self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
@@ -370,6 +373,7 @@ class vtkMeshWidget ():
         actor.GetProperty().SetLineWidth(0)
         actor.GetProperty().SetRepresentationToPoints
         actor.GetProperty().SetPointSize( 5)
+	actor.SetOrigin(actor.GetCenter())
         #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
         # how do we rander disk instead of small square  for the points ?!
 
@@ -577,7 +581,7 @@ class vtkMeshWidget ():
 
 	self.ren.GetActiveCamera().SetPosition( self.center[0], self.center[1], self.center[2]+self.sceneWidth)
 	self.ren.GetActiveCamera().SetFocalPoint( self.center[0], self.center[1], self.center[2])
-
+	
 
     def plotObjFile(self,fame):
 
@@ -595,10 +599,10 @@ class vtkMeshWidget ():
         self.renWin.Render()
 
     def resetCuttingPlanes(self):
-
-	self.setXCuttingPlane(self.cutingPlanesWidget.xSlider.value())
-	self.setYCuttingPlane(self.cutingPlanesWidget.ySlider.value())
-	self.setZCuttingPlane(self.cutingPlanesWidget.zSlider.value())
+	if  self.cuttingPlanes!=[]:
+	    self.setXCuttingPlane(self.cutingPlanesWidget.xSlider.value())
+	    self.setYCuttingPlane(self.cutingPlanesWidget.ySlider.value())
+	    self.setZCuttingPlane(self.cutingPlanesWidget.zSlider.value())
 
 
     def setXCuttingPlane(self,value):
@@ -619,13 +623,14 @@ class vtkMeshWidget ():
 	self.renWin.Render()#seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
 
     def refreshCuttingPLanes(self):
-        actors=self.ren.GetActors()
-        actors.InitTraversal()
-        for i in range(actors.GetNumberOfItems()):
-            a=actors.GetNextActor()
-            #cutter.AddInputConnection(self.reader.GetOutputPort())# is need to ba able to generate a vtkAlgorithmOutput from vtkPolyData , cannot find out how to do that
-            #cutter.AddInput(a.GetMapper().GetInput())
-            a.GetMapper().SetClippingPlanes(self.cuttingPlanesVtk)
+	if  self.cuttingPlanes!=[]:
+	    actors=self.ren.GetActors()
+	    actors.InitTraversal()
+	    for i in range(actors.GetNumberOfItems()):
+		a=actors.GetNextActor()
+		#cutter.AddInputConnection(self.reader.GetOutputPort())# is need to ba able to generate a vtkAlgorithmOutput from vtkPolyData , cannot find out how to do that
+		#cutter.AddInput(a.GetMapper().GetInput())
+		a.GetMapper().SetClippingPlanes(self.cuttingPlanesVtk)
 
     def addCuttingPlane(self,origin,normal):
 
@@ -719,14 +724,16 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 	self.AddObserver("MiddleButtonReleaseEvent",  self.ButtonEvent)
 	self.AddObserver("RightButtonPressEvent",  self.ButtonEvent)
 	self.AddObserver("RightButtonReleaseEvent",  self.ButtonEvent)
-	self.AddObserver("KeyPressEvent", self.KeyPressedEvent)
+	self.AddObserver("KeyPressEvent", self.KeyEvent)
+	self.AddObserver("KeyReleaseEvent", self.KeyEvent)
 	
 	self.Rotating = 0
 	self.Panning  = 0
 	self.Zooming  = 0
+	self.rotate_object = False
 	self.AddObserver("MouseMoveEvent", self.MouseMoveEvent)
 	   
-		
+	
     def ButtonEvent(self,obj, event):
 	
 	if event == "LeftButtonPressEvent":
@@ -740,7 +747,8 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 	elif event == "RightButtonPressEvent":
 	    self.Zooming = 1
 	elif event == "RightButtonReleaseEvent":
-	    self.Zooming = 0	
+	    self.Zooming = 0
+    
      
     def MouseMoveEvent(self,obj,eventName):
 	
@@ -748,7 +756,7 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 	    iren = obj.GetInteractor()
 	    renWin=iren.GetRenderWindow()
 	    ren=renWin.GetRenderers().GetFirstRenderer()	
-	    camera=ren.GetActiveCamera()
+	    camera=ren.GetActiveCamera()	    
 	    lastXYpos = iren.GetLastEventPosition()
 	    lastX = lastXYpos[0]
 	    lastY = lastXYpos[1]
@@ -761,52 +769,78 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 	    centerX = center[0]/2.0
 	    centerY = center[1]/2.0	    
 		  
-	    if self.Rotating: 		
-		
-		camera.Azimuth(lastX-x)
-		camera.Elevation(lastY-y)
-		camera.OrthogonalizeViewUp()	    
-		renWin.Render()		    
+	    if self.Rotating: 
+		if  self.rotate_object:
+		   
+		    actors=ren.GetActors()
+		    actor=actors.GetLastActor()
+		    
+		    actor.GetPosition()		
+		    actor.GetOrientation()
+		    actor.RotateZ(lastX-x)
+		    #actor.RotateY(lastY-y)
+		    renWin.Render()	
+		else:
+		   	
+		    camera.Azimuth(lastX-x)
+		    camera.Elevation(lastY-y)
+		    #camera.OrthogonalizeViewUp()	 
+		    camera.SetViewUp((0.0,0.0,1.0))
+		    renWin.Render()		    
 	    
 	    if  self.Panning:
-		FPoint = camera.GetFocalPoint()
-		FPoint0 = FPoint[0]
-		FPoint1 = FPoint[1]
-		FPoint2 = FPoint[2]
-    
-		PPoint = camera.GetPosition()
-		PPoint0 = PPoint[0]
-		PPoint1 = PPoint[1]
-		PPoint2 = PPoint[2]
-    
-		ren.SetWorldPoint(FPoint0, FPoint1, FPoint2, 1.0)
-		ren.WorldToDisplay()
-		DPoint = ren.GetDisplayPoint()
-		focalDepth = DPoint[2]
-    
-		APoint0 = centerX+(x-lastX)
-		APoint1 = centerY+(y-lastY)
-		
-		ren.SetDisplayPoint(APoint0, APoint1, focalDepth)
-		ren.DisplayToWorld()
-		RPoint = ren.GetWorldPoint()
-		RPoint0 = RPoint[0]
-		RPoint1 = RPoint[1]
-		RPoint2 = RPoint[2]
-		RPoint3 = RPoint[3]
+		if  self.rotate_object:
+		    actors=ren.GetActors()
+		    actor=actors.GetLastActor()
+		    pos=actor.GetPosition()
+		    viewDir=camera.GetViewPlaneNormal()
+		    n=numpy.sqrt(viewDir[0]**2+viewDir[1]**2)
+		    viewDir2D= numpy.array([viewDir[0]/n,viewDir[1]/n,0])
+		    dir2=numpy.cross(viewDir2D,numpy.array([0,0,1]))
+		    rotation=numpy.column_stack((dir2,viewDir2D))
+		    displacement=rotation.dot(numpy.array([(lastX-x)/100.,(lastY-y)/100.]))
+		    newpos=(pos[0]+displacement[0],pos[1]+displacement[1],pos[2]+displacement[2])		    
+		    actor.SetPosition(newpos)	
+		    renWin.Render()
+		else:
+		    FPoint = camera.GetFocalPoint()
+		    FPoint0 = FPoint[0]
+		    FPoint1 = FPoint[1]
+		    FPoint2 = FPoint[2]
 	
-		if RPoint3 != 0.0:
-		    RPoint0 = RPoint0/RPoint3
-		    RPoint1 = RPoint1/RPoint3
-		    RPoint2 = RPoint2/RPoint3
+		    PPoint = camera.GetPosition()
+		    PPoint0 = PPoint[0]
+		    PPoint1 = PPoint[1]
+		    PPoint2 = PPoint[2]
+	
+		    ren.SetWorldPoint(FPoint0, FPoint1, FPoint2, 1.0)
+		    ren.WorldToDisplay()
+		    DPoint = ren.GetDisplayPoint()
+		    focalDepth = DPoint[2]
+	
+		    APoint0 = centerX+(x-lastX)
+		    APoint1 = centerY+(y-lastY)
+		    
+		    ren.SetDisplayPoint(APoint0, APoint1, focalDepth)
+		    ren.DisplayToWorld()
+		    RPoint = ren.GetWorldPoint()
+		    RPoint0 = RPoint[0]
+		    RPoint1 = RPoint[1]
+		    RPoint2 = RPoint[2]
+		    RPoint3 = RPoint[3]
 	    
-		camera.SetFocalPoint( (FPoint0-RPoint0)/2.0 + FPoint0,
-			              (FPoint1-RPoint1)/2.0 + FPoint1,
-			              (FPoint2-RPoint2)/2.0 + FPoint2)
-		camera.SetPosition( (FPoint0-RPoint0)/2.0 + PPoint0,
-			            (FPoint1-RPoint1)/2.0 + PPoint1,
-			            (FPoint2-RPoint2)/2.0 + PPoint2)
-		renWin.Render()
+		    if RPoint3 != 0.0:
+			RPoint0 = RPoint0/RPoint3
+			RPoint1 = RPoint1/RPoint3
+			RPoint2 = RPoint2/RPoint3
+		
+		    camera.SetFocalPoint( (FPoint0-RPoint0)/2.0 + FPoint0,
+			                  (FPoint1-RPoint1)/2.0 + FPoint1,
+			                  (FPoint2-RPoint2)/2.0 + FPoint2)
+		    camera.SetPosition( (FPoint0-RPoint0)/2.0 + PPoint0,
+			                (FPoint1-RPoint1)/2.0 + PPoint1,
+			                (FPoint2-RPoint2)/2.0 + PPoint2)
+		    renWin.Render()
 	    if  self.Zooming:
 		dollyFactor = pow(1.02,(0.5*(y-lastY)))
 		if camera.GetParallelProjection():
@@ -818,10 +852,26 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 	    
 		renWin.Render()     
 	
-    def KeyPressedEvent(self,obj,eventName):
-        iren = obj.GetInteractor()
+    def KeyEvent(self,obj,eventName):
+        iren = obj.GetInteractor()		    
+
         key = iren.GetKeyCode()
-	print "pressed key "+  key
+	KeyPressed=eventName=='KeyPressEvent'
+	if eventName=='KeyPressEvent':
+	    print "pressed key "+  key
+	else:
+	    print "released key "+  key   
+	if KeyPressed and (key=='q' or key=='Q'):
+	    self.rotate_object=~self.rotate_object
+	    
+	if key=='z':	      
+	    renWin=iren.GetRenderWindow()
+	    ren=renWin.GetRenderers().GetFirstRenderer()	
+	    camera=ren.GetActiveCamera()
+	    camera.SetViewUp((0.0,0.0,1.0))
+	    camera.OrthogonalizeViewUp()	  
+	    v=camera.GetViewUp()
+	    renWin.Render()
 	pass	
     
 
@@ -842,7 +892,7 @@ class Example(QtGui.QMainWindow):
 	#self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
 	self.viewWidget.iren.AddObserver("MouseWheelForwardEvent", self.myWheelCallback)
 	self.viewWidget.iren.AddObserver("MouseWheelBackwardEvent", self.myWheelCallback)
-	#self.viewWidget.iren.AddObserver("InteractionEvent", self.myInteractionCallback)
+	self.viewWidget.iren.AddObserver("keyPressedEvent", self.myKeyPressedCallback)
 	
         #self.statusBar()
 
@@ -878,8 +928,13 @@ class Example(QtGui.QMainWindow):
 
 	    mapper=pointsActor.GetProperty().SetPointSize( pointSize)
 	    self.viewWidget.renWin.Render()
-	    
-	    
+    def myKeyPressedCallback(self,obj,eventName): 
+
+	print "pressed key "+obj.GetKeyCode()
+	PyQTVTKMeshViewer.vtkMeshWidget.Keypressed(self,obj, event)
+	if obj.GetKeyCode()=='r':# perform a virtual scan
+		 self.viewWidget.recenterCamera()	   
+ 
 	    
     def openFileGui(self):
 
@@ -921,6 +976,7 @@ class Example(QtGui.QMainWindow):
 	    pointCloud={'pointsActor': pointsActor,'vtkcolors_fields':vtkcolors_fields}
 	    self.pointClouds.append(pointCloud)
 	    self.viewWidget.recenterCamera()
+	   
 
 
 	    def update_colors(id):
