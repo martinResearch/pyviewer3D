@@ -156,6 +156,11 @@ def loadPCD(filename):
 				rgb_int=unpack('I',pack('f',color_float))[0] # tha does not seem to work , as i do not get the right colors when using pcd_viewer
 				colors[i,:]=[(rgb_int>>16)& 0x0000ff,(rgb_int>>8)& 0x0000ff,(rgb_int)& 0x0000ff]
 			del Data['rgb']
+		elif   Data.has_key('rgba'):
+			print 'not et coded'
+			raise
+		else:
+			colors.fill(128)
 		for key in ['x','y','z']:
 			del Data[key]
 		return points,colors, Data,maps
