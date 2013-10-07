@@ -77,7 +77,7 @@ def savePCD(transform,points,filename,idpolys,polygons,idlabelToMaterial,labelCo
 				f.write('%.7f'%p[0]+' '+'%.7f'%p[1]+' '+'%.7f'%p[2]+' '+rgb_string+' '+str(label)+' '+str(idpoly)+'\n')
 
 
-def loadPCD(filename):
+def loadPCD(filename,default_color=[128,128,128]):
 	header_dict=dict()
 	maps=dict()
 	with open(filename, 'rb') as f:
@@ -160,7 +160,9 @@ def loadPCD(filename):
 			print 'not et coded'
 			raise
 		else:
-			colors.fill(128)
+			colors[:,0].fill(default_color[0])
+			colors[:,1].fill(default_color[1])
+			colors[:,2].fill(default_color[2])
 		for key in ['x','y','z']:
 			del Data[key]
 		return points,colors, Data,maps
