@@ -146,25 +146,37 @@ def loadPCD(filename,default_color=[128,128,128]):
 			print 'loading type '+ datatype+' not yet coded'
 			raise
 					
-
-		points=np.column_stack ((Data['x'],Data['y'],Data['z'])).reshape(int(header_dict['HEIGHT'][0]),int(header_dict['WIDTH'][0]),-1)
-
+		if Data.has_key('x') and Data.has_key('y') and Data.has_key('y'):
+			points=np.column_stack ((Data['x'],Data['y'],Data['z'])).reshape(int(header_dict['HEIGHT'][0]),int(header_dict['WIDTH'][0]),-1)
+		else:
+			points=[]		
 		colors=np.empty((nbPoints,3),dtype=np.uint8)
 		from struct import pack,unpack
 		if Data.has_key('rgb'):
 			for i,color_float in enumerate(Data['rgb']):
+				#from http://www.pointclouds.org/documentation/tutorials/adding_custom_ptype.php:
+				# "The reason why rgb data is being packed as a float comes from the early development
+				#o f PCL as part of the ROS project, where RGB data is still being sent by wire as 
+				#float numbers. We expect this data type to be dropped as soon as all legacy code has 
+				#been rewritten (most likely in PCL 2.x).
 				rgb_int=unpack('I',pack('f',color_float))[0] # tha does not seem to work , as i do not get the right colors when using pcd_viewer
 				colors[i,:]=[(rgb_int>>16)& 0x0000ff,(rgb_int>>8)& 0x0000ff,(rgb_int)& 0x0000ff]
 			del Data['rgb']
 		elif   Data.has_key('rgba'):
 			print 'not et coded'
-			raise
+			colors[:,0].fill(default_color[0])
+			colors[:,1].fill(default_color[1])
+			colors[:,2].fill(default_color[2])			
 		else:
 			colors[:,0].fill(default_color[0])
 			colors[:,1].fill(default_color[1])
 			colors[:,2].fill(default_color[2])
+		if  Data.has_key('normal_x'):
+			Data['normals']=np.column_stack ((Data['normal_x'],Data['normal_y'],Data['normal_z'])).reshape(int(header_dict['HEIGHT'][0]),int(header_dict['WIDTH'][0]),-1)
+			
 		for key in ['x','y','z']:
-			del Data[key]
+			if Data.has_key(key):
+				del Data[key]
 		return points,colors, Data,maps
 
 

@@ -508,7 +508,40 @@ class vtkMeshWidget ():
 	self.refreshCuttingPLanes()
         self.renWin.Render()
 	return actor.GetAddressAsString(None)
-
+    
+    def plotVectorField(self,points, directions,color=[1,0,0],scale=1):
+	vtk_points = vtk.vtkPoints()
+	vtk_lines = vtk.vtkCellArray()
+	poly = vtk.vtkPolyData()
+	  
+	  
+	for i,p,d in zip(range(points.shape[0]),points,directions):
+	    vtk_points.InsertNextPoint(p[0],p[1],p[2])
+	    vtk_points.InsertNextPoint(p[0]+d[0]*scale,p[1]+d[1]*scale,p[2]+d[2]*scale)
+	    line = vtk.vtkLine()
+	    line.GetPointIds().SetId(0,2*i) # the second 0 is the index of the Origin in the vtkPoints
+	    line.GetPointIds().SetId(1,2*i+1) # the second 1 is the index of P0 in the vtkPoints
+	    vtk_lines.InsertNextCell(line)
+	poly.SetPoints(vtk_points)
+	poly.SetLines(vtk_lines)	
+	
+	
+	mapper = vtk.vtkPolyDataMapper()
+	mapper.SetInput(poly)
+	
+	
+	actor = vtk.vtkActor()
+	actor.SetMapper(mapper)
+	
+	actor.GetProperty().EdgeVisibilityOff()
+	actor.GetProperty().SetEdgeColor(1, 0,0)
+	actor.GetProperty().SetColor( color[0], color[1], color[2] )
+	
+	self.ren.AddActor(actor)				
+	self.resetCuttingPlanes()
+	self.refreshCuttingPLanes()
+	self.renWin.Render()	
+	
     def plotPolyLines(self,listPolyLines,color=[0,0,0]):
 		# if the purpose is to display edges of polygons on top of the rendered polygon
 	        # this mighr not work very well due to z buffer conflicts
@@ -668,10 +701,23 @@ class vtkMeshWidget ():
         #self.ren.AddActor(planeActor)
        # self.renWin.Render()
 	return cuttingplane
-
+    
+    def pickPoint(self,x,y):
+	picker = vtk.vtkPointPicker()
+	pickedbool=picker.Pick(x, y,0, self.ren)
+	if pickedbool==1:
+	    #print "picked point "+str( picker.GetPointId())+" at "+ str(picker.GetPickPosition()) 
+	    p3D=picker.GetPickPosition()
+	    pickedActorId=picker.GetActor().GetAddressAsString(None)
+	    pickedPointId=picker.GetPointId()
+	else:
+	    p3D=None
+	    pickedActorId=None
+	    pickedPointId=None	    
+	return pickedPointId,p3D,pickedActorId
     def pickCell(self,x,y):
-        #picker = vtk.vtkPropPicker()
-        #picker.PickProp(x, y, self.renderer, EventHandler().get_markers())
+ 
+	    
         #actor = picker.GetActor()
         #from http://nullege.com/codes/show/src@m@u@MultiScaleSVD-HEAD@icicle_noview_textured.py/599/vtk.vtkCellPicker
         cellPicker = vtk. vtkCellPicker()
@@ -697,18 +743,18 @@ class vtkMeshWidget ():
             ##for i in range(idList.GetNumberOfIds()):
             ##    print idList.GetId(i)# does no work...
         else:
-            pickedCellId=[]
+            pickedCellId=[]#maybe should i use None
             p3D=[]
             pickedActorId=[]
 
         return pickedCellId,p3D,pickedActorId
 
 
-    def addLabelingPanel(self,listLabels,function):
+    def addLabelingPanel(self,listLabels,function,position):
 
 	    self. labellingPanel=labellingPanelWidget(listLabels,function)
 
-	    self.gridlayout.addWidget(self. labellingPanel, 0, 1)
+	    self.gridlayout.addWidget(self. labellingPanel, 0, position)
 
 
 	   
@@ -892,6 +938,8 @@ class Example(QtGui.QMainWindow):
 	#self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
 	self.viewWidget.iren.AddObserver("MouseWheelForwardEvent", self.myWheelCallback)
 	self.viewWidget.iren.AddObserver("MouseWheelBackwardEvent", self.myWheelCallback)
+	self.viewWidget.iren.AddObserver("MiddleButtonPressEvent", self.myMiddleButtonEvent)
+	self.viewWidget.iren.AddObserver("keyPressedEvent", self.myKeyPressedCallback)
 	self.viewWidget.iren.AddObserver("keyPressedEvent", self.myKeyPressedCallback)
 	
         #self.statusBar()
@@ -919,23 +967,44 @@ class Example(QtGui.QMainWindow):
 	    for pointCloud in self.pointClouds:
 		pointsActor=pointCloud['pointsActor']
 		pointSize=pointsActor.GetProperty().GetPointSize()
-	    if eventName=='MouseWheelForwardEvent':
-		pointSize=pointSize+1
-	    else:
-		pointSize=pointSize-1
-		if pointSize<1:
-		    pointSize=1
-
-	    mapper=pointsActor.GetProperty().SetPointSize( pointSize)
+		if eventName=='MouseWheelForwardEvent':
+		    pointSize=pointSize+1
+		else:
+		    pointSize=pointSize-1
+		    if pointSize<1:
+			pointSize=1
+    
+		mapper=pointsActor.GetProperty().SetPointSize( pointSize)
 	    self.viewWidget.renWin.Render()
     def myKeyPressedCallback(self,obj,eventName): 
 
 	print "pressed key "+obj.GetKeyCode()
 	PyQTVTKMeshViewer.vtkMeshWidget.Keypressed(self,obj, event)
-	if obj.GetKeyCode()=='r':# perform a virtual scan
-		 self.viewWidget.recenterCamera()	   
- 
-	    
+	if obj.GetKeyCode()=='r':
+		 self.viewWidget.recenterCamera()	  
+		 
+    def myMiddleButtonEvent(self,obj, event):
+	(x,y) = self.viewWidget.iren.GetEventPosition()
+	self.viewWidget.renWin.Render()
+	pointId,point,actorId=self.viewWidget.pickPoint(x,y) 
+	if pointId!=None:
+	    print "picked point "+str(pointId) + " on actor"+str(actorId)
+	    pointCLoudActorIDs=[p['pointsActor'].GetAddressAsString(None) for p in self.pointClouds]
+	    if actorId in pointCLoudActorIDs:
+		idActorInList=pointCLoudActorIDs.index(actorId)
+		data=self.pointClouds[idActorInList]['data']
+		for key in data.keys():
+		    if data[key].ndim==1:
+			print key+" = "+str(data[key][pointId])
+		    elif data[key].ndim==2:
+			print key+"="+str(data[key][pointId,:])
+			if len(data[key][pointId,:])>10:
+			    from matplotlib import pyplot as plt
+			    plt.figure()
+			    plt.ion()			   
+			    plt.plot  (data[key][pointId,:])  
+			    plt.show()
+		
     def openFileGui(self):
 
         fname = str(QtGui.QFileDialog.getOpenFileName(self, 'Open file',       os.getcwd()))
@@ -956,41 +1025,81 @@ class Example(QtGui.QMainWindow):
 	    #self.viewWidget.plotPoints(points.reshape((-1,3)))
 	    
 	    
+	    if points!=[]:
+		pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
+		vtkcolors_fields=dict()
+		adding_data_to_point_cloud=False
+	    else:
+		if  len(self.pointClouds)>=1:		   
+		    vtkcolors_fields= self.pointClouds[-1]['vtkcolors_fields']
+		    points=self.pointClouds[-1]['points']
+		    adding_data_to_point_cloud=True
+		    pointsActor=self.pointClouds[-1]['pointsActor']
+		
+		    
+		else:
+		    print "you can add data to point cloud only if there is alread a point cloud in the scene"
 	   
-	    pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
-
-	    vtkcolors_fields=dict()
 
 	    vtkcolors_fields['rgb']=numpyArrayToVtkUnsignedCharArray(colors)
-
+	    if data.has_key('normals'):
+		colorsn=(255*(0.5+0.5*data['normals']).reshape((-1,3))).astype(int)
+		vtkcolors_fields['normals colors']=numpyArrayToVtkUnsignedCharArray(colorsn)
+		#normalsActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),data['normals'].reshape((-1,3)),color=[1,0,0],scale=0.1)
+	    
+	    if data.has_key('rf'):
+		references=data['rf'].reshape(-1,3,3)
+		referencesXActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,0,:].reshape((-1,3)),color=[1,0,0],scale=0.1)	
+		referencesYActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,1,:].reshape((-1,3)),color=[0,1,0],scale=0.1)	
+		referencesZActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,2,:].reshape((-1,3)),color=[0,0,1],scale=0.1)	
 	    for key in data.keys():
 		    if issubclass(data[key].dtype.type, numpy.integer):
 			colormap=(numpy.random.rand(numpy.max(data[key])+1,3)*255).astype(int)
 			newcolors=colormap[data[key]]
 			vtk_colors =numpyArrayToVtkUnsignedCharArray(newcolors)
 		    else:
-			vtk_colors=[]
-			print 'no yet coded'
-			continue
+			if data[key].size==points.shape[0]*points.shape[1]:
+			    colors=numpy.zeros((points.shape[0]*points.shape[1],3),dtype=int)
+			    normalize = not (key in ['normal_x','normal_y','normal_z'])
+			    if normalize:
+				colors[:,0]=(255*data[key]/numpy.max(data[key])).astype(int)
+			    else:
+				assert(numpy.max(data[key]))<=1
+				colors[:,0]=(255*data[key]).astype(int)
+			    colors[:,1]=colors[:,0]
+			    colors[:,2]=colors[:,0]
+			    vtk_colors=numpyArrayToVtkUnsignedCharArray(colors)
+			else :
+			    continue
+			
+			
+			
 		    vtkcolors_fields[key]=vtk_colors
-	    pointCloud={'pointsActor': pointsActor,'vtkcolors_fields':vtkcolors_fields}
-	    self.pointClouds.append(pointCloud)
+	   
+	    if not(adding_data_to_point_cloud):
+		pointCloud={'pointsActor': pointsActor,'vtkcolors_fields':vtkcolors_fields,'points':points,'data':data}
+		self.pointClouds.append(pointCloud)
+	    else:
+		for key in data.keys():
+		    self.pointClouds[-1]['data'][key]=data[key]
+			   	    
 	    self.viewWidget.recenterCamera()
 	   
 
 
 	    def update_colors(id):
-
-		mapper=self.pointsActor.GetMapper()
-		poly=mapper.GetInput()
-		key=vtkcolors_fields.keys()[id]
-		if vtkcolors_fields[key]!=[]:
-		    poly.GetPointData().SetScalars(vtkcolors_fields[key])
-		    self.viewWidget.renWin.Render()
-		    if maps.has_key(key):
-			pass # should display the legend
-
-	    self.viewWidget.addLabelingPanel(vtkcolors_fields.keys(),update_colors)
+		
+		    actor=pointsActor
+		    mapper=actor.GetMapper()
+		    poly=mapper.GetInput()
+		    key=vtkcolors_fields.keys()[id]		    
+		    if vtkcolors_fields.has_key(key) and vtkcolors_fields[key]!=[]:
+			poly.GetPointData().SetScalars(vtkcolors_fields[key])
+			self.viewWidget.renWin.Render()
+			if maps.has_key(key):
+			    pass # should display the legend
+	  
+	    self.viewWidget.addLabelingPanel(vtkcolors_fields.keys(),update_colors,position=len(self.pointClouds))
 
 
 	else:
@@ -1035,7 +1144,7 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene22_m1.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
     sys.exit(app.exec_())
 
