@@ -305,7 +305,7 @@ class vtkMeshWidget ():
 
 
 
-    def plotPoints(self,points,colors=[]):
+    def plotPoints(self,points,colors=[],AddActor=True):
 
         # look here for vtk examples in python http://www.vtk.org/Wiki/VTK/Examples/Python
 
@@ -377,15 +377,15 @@ class vtkMeshWidget ():
         #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
         # how do we rander disk instead of small square  for the points ?!
 
-
-        self.ren.AddActor(actor)
-
-	if self.ren.GetActors().GetNumberOfItems()==1:
-	    self.recenterCamera()
-	self.updateBoxWithOffset()
-	self.resetCuttingPlanes()
-	self.refreshCuttingPLanes()
-        self.renWin.Render()
+	if AddActor:
+	    self.ren.AddActor(actor)
+    
+	    if self.ren.GetActors().GetNumberOfItems()==1:
+		self.recenterCamera()
+	    self.updateBoxWithOffset()
+	    self.resetCuttingPlanes()
+	    self.refreshCuttingPLanes()
+	    self.renWin.Render()
 
         return actor
 
@@ -509,7 +509,7 @@ class vtkMeshWidget ():
         self.renWin.Render()
 	return actor.GetAddressAsString(None)
     
-    def plotVectorField(self,points, directions,color=[1,0,0],scale=1):
+    def plotVectorField(self,points, directions,color=[1,0,0],scale=1,AddActor=True):
 	vtk_points = vtk.vtkPoints()
 	vtk_lines = vtk.vtkCellArray()
 	poly = vtk.vtkPolyData()
@@ -536,11 +536,13 @@ class vtkMeshWidget ():
 	actor.GetProperty().EdgeVisibilityOff()
 	actor.GetProperty().SetEdgeColor(1, 0,0)
 	actor.GetProperty().SetColor( color[0], color[1], color[2] )
-	
-	self.ren.AddActor(actor)				
-	self.resetCuttingPlanes()
-	self.refreshCuttingPLanes()
-	self.renWin.Render()	
+	actor.SetOrigin(actor.GetCenter())
+	if AddActor:
+	    self.ren.AddActor(actor)				
+	    self.resetCuttingPlanes()
+	    self.refreshCuttingPLanes()
+	    self.renWin.Render()	
+	return actor
 	
     def plotPolyLines(self,listPolyLines,color=[0,0,0]):
 		# if the purpose is to display edges of polygons on top of the rendered polygon
@@ -708,7 +710,8 @@ class vtkMeshWidget ():
 	if pickedbool==1:
 	    #print "picked point "+str( picker.GetPointId())+" at "+ str(picker.GetPickPosition()) 
 	    p3D=picker.GetPickPosition()
-	    pickedActorId=picker.GetActor().GetAddressAsString(None)
+	    #pickedActorId=picker.GetActor().GetAddressAsString(None)
+	    pickedActorId=picker.GetActors().GetLastItem().GetAddressAsString(None)
 	    pickedPointId=picker.GetPointId()
 	else:
 	    p3D=None
@@ -817,9 +820,10 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 		  
 	    if self.Rotating: 
 		if  self.rotate_object:
-		   
-		    actors=ren.GetActors()
-		    actor=actors.GetLastActor()
+		    #actors=ren.GetActors()
+		    #actor=actors.GetLastActor()
+		    props=ren.GetProps()
+		    actor=props.GetLastProp()
 		    
 		    actor.GetPosition()		
 		    actor.GetOrientation()
@@ -836,8 +840,10 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 	    
 	    if  self.Panning:
 		if  self.rotate_object:
-		    actors=ren.GetActors()
-		    actor=actors.GetLastActor()
+		    #actors=ren.GetActors()
+		    #actor=actors.GetLastActor()
+		    props=ren.GetProps()
+		    actor=props.GetLastProp()			    
 		    pos=actor.GetPosition()
 		    viewDir=camera.GetViewPlaneNormal()
 		    n=numpy.sqrt(viewDir[0]**2+viewDir[1]**2)
@@ -990,6 +996,7 @@ class Example(QtGui.QMainWindow):
 	if pointId!=None:
 	    print "picked point "+str(pointId) + " on actor"+str(actorId)
 	    pointCLoudActorIDs=[p['pointsActor'].GetAddressAsString(None) for p in self.pointClouds]
+	   
 	    if actorId in pointCLoudActorIDs:
 		idActorInList=pointCLoudActorIDs.index(actorId)
 		data=self.pointClouds[idActorInList]['data']
@@ -1004,6 +1011,12 @@ class Example(QtGui.QMainWindow):
 			    plt.ion()			   
 			    plt.plot  (data[key][pointId,:])  
 			    plt.show()
+	    else:
+		print "picked somehing else than a point cloud"
+		associatedActorsActorIDs=[]
+		for p in self.pointClouds:
+		    for p2 in p['associatedActors']:
+			associatedActorsActorIDs.append(p2.GetAddressAsString(None) )		
 		
     def openFileGui(self):
 
@@ -1026,16 +1039,22 @@ class Example(QtGui.QMainWindow):
 	    
 	    
 	    if points!=[]:
-		pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)))
+		ass=vtk.vtkAssembly()
+		pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)),AddActor=False)
+		ass.AddPart(pointsActor)
 		vtkcolors_fields=dict()
 		adding_data_to_point_cloud=False
+		associatedActors=[]
+		
+		 
 	    else:
 		if  len(self.pointClouds)>=1:		   
 		    vtkcolors_fields= self.pointClouds[-1]['vtkcolors_fields']
 		    points=self.pointClouds[-1]['points']
 		    adding_data_to_point_cloud=True
 		    pointsActor=self.pointClouds[-1]['pointsActor']
-		
+		    associatedActors=self.pointClouds[-1]['associatedActors']
+		    ass=self.pointClouds[-1]['assemblyActor']
 		    
 		else:
 		    print "you can add data to point cloud only if there is alread a point cloud in the scene"
@@ -1049,9 +1068,20 @@ class Example(QtGui.QMainWindow):
 	    
 	    if data.has_key('rf'):
 		references=data['rf'].reshape(-1,3,3)
-		referencesXActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,0,:].reshape((-1,3)),color=[1,0,0],scale=0.1)	
-		referencesYActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,1,:].reshape((-1,3)),color=[0,1,0],scale=0.1)	
-		referencesZActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,2,:].reshape((-1,3)),color=[0,0,1],scale=0.1)	
+		referencesXActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,0,:].reshape((-1,3)),color=[1,0,0],scale=0.1,AddActor=False)	
+		
+		referencesYActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,1,:].reshape((-1,3)),color=[0,1,0],scale=0.1,AddActor=False)	
+		referencesZActor=self.viewWidget.plotVectorField(points.reshape((-1,3)),references[:,2,:].reshape((-1,3)),color=[0,0,1],scale=0.1,AddActor=False)	
+		referencesXActor.SetPickable(False)
+		referencesYActor.SetPickable(False)
+		referencesZActor.SetPickable(False)
+		associatedActors.append(referencesXActor)
+		associatedActors.append(referencesYActor)
+		associatedActors.append(referencesZActor)
+		ass.AddPart(referencesXActor)
+		ass.AddPart(referencesYActor)
+		ass.AddPart(referencesZActor)
+		
 	    for key in data.keys():
 		    if issubclass(data[key].dtype.type, numpy.integer):
 			colormap=(numpy.random.rand(numpy.max(data[key])+1,3)*255).astype(int)
@@ -1075,9 +1105,26 @@ class Example(QtGui.QMainWindow):
 			
 			
 		    vtkcolors_fields[key]=vtk_colors
+		    
+	    #ren=  self.viewWidget.ren
+	    #actors=ren.GetActors()
+	    #actors.GetNumberOfItems()
+	    #actor=actors.GetLastActor()
+	    #props=ren.GetProps()
+	    #props.GetLastProp()
+	    ass.SetOrigin(pointsActor.GetCenter())
+	    self.viewWidget.ren.AddActor(ass)
+	    #actors=ren.GetActors()
+	    #actors.GetNumberOfItems()
+	    #actor=actors.GetLastActor()	
+	    #props=ren.GetProps()
+	    #props.GetLastProp()	    
+	    self.viewWidget.resetCuttingPlanes()
+	    self.viewWidget.refreshCuttingPLanes()
+	    self.viewWidget.renWin.Render()	
 	   
 	    if not(adding_data_to_point_cloud):
-		pointCloud={'pointsActor': pointsActor,'vtkcolors_fields':vtkcolors_fields,'points':points,'data':data}
+		pointCloud={'pointsActor': pointsActor,'vtkcolors_fields':vtkcolors_fields,'points':points,'data':data,'associatedActors':associatedActors,'assemblyActor':ass}
 		self.pointClouds.append(pointCloud)
 	    else:
 		for key in data.keys():
