@@ -945,8 +945,8 @@ class Example(QtGui.QMainWindow):
 	self.viewWidget.iren.AddObserver("MouseWheelForwardEvent", self.myWheelCallback)
 	self.viewWidget.iren.AddObserver("MouseWheelBackwardEvent", self.myWheelCallback)
 	self.viewWidget.iren.AddObserver("MiddleButtonPressEvent", self.myMiddleButtonEvent)
-	self.viewWidget.iren.AddObserver("keyPressedEvent", self.myKeyPressedCallback)
-	self.viewWidget.iren.AddObserver("keyPressedEvent", self.myKeyPressedCallback)
+	self.viewWidget.iren.AddObserver("KeyPressEvent", self.myKeyPressedCallback)
+	
 	
         #self.statusBar()
 
@@ -982,41 +982,80 @@ class Example(QtGui.QMainWindow):
     
 		mapper=pointsActor.GetProperty().SetPointSize( pointSize)
 	    self.viewWidget.renWin.Render()
+	    
     def myKeyPressedCallback(self,obj,eventName): 
 
-	print "pressed key "+obj.GetKeyCode()
-	PyQTVTKMeshViewer.vtkMeshWidget.Keypressed(self,obj, event)
-	if obj.GetKeyCode()=='r':
-		 self.viewWidget.recenterCamera()	  
-		 
-    def myMiddleButtonEvent(self,obj, event):
+	print "Pressed key "+obj.GetKeyCode()
+	#self.vtkMeshWidget.Keypressed(self,obj, event)
+	#if obj.GetKeyCode()=='r':
+	#	 self.viewWidget.recenterCamera()	 
+	if obj.GetKeyCode()=='f':
+	    for p in self.pointClouds:
+		for a in p['associatedActors']:
+		    a.SetVisibility(1-a.GetVisibility())
+	    self.viewWidget.renWin.Render()
+	if obj.GetKeyCode()=='d':
+	    pointId,idActorInList=self.lastPickedPoint
+	    if  pointId!=None:
+		pickedPointDescriptor=self.pointClouds[idActorInList]['data']['shot'][pointId,:]
+		for p in self.pointClouds:
+		    actor= p['pointsActor']
+		    mapper=actor.GetMapper()
+		    poly=mapper.GetInput()
+		    points=p['points'].reshape(-1,3)
+		    nbpoints=points.shape[0]
+		    
+		    diff=p['data']['shot']-pickedPointDescriptor
+		    dist=numpy.sqrt(numpy.sum(diff**2,axis=1))
+		    threshold=1.
+		    dist=numpy.minimum(dist,threshold)
+		    color_grey=(255*dist/threshold).astype(int)
+		    colors=numpy.column_stack((color_grey,color_grey,color_grey))
+		    vtkcolors=numpyArrayToVtkUnsignedCharArray(colors)
+		    poly.GetPointData().SetScalars(vtkcolors)
+		    self.viewWidget.renWin.Render()
+				   	
+	
+    def pickPoint(self,event):
 	(x,y) = self.viewWidget.iren.GetEventPosition()
 	self.viewWidget.renWin.Render()
 	pointId,point,actorId=self.viewWidget.pickPoint(x,y) 
+	idActorInList=None
 	if pointId!=None:
 	    print "picked point "+str(pointId) + " on actor"+str(actorId)
 	    pointCLoudActorIDs=[p['pointsActor'].GetAddressAsString(None) for p in self.pointClouds]
 	   
 	    if actorId in pointCLoudActorIDs:
 		idActorInList=pointCLoudActorIDs.index(actorId)
-		data=self.pointClouds[idActorInList]['data']
-		for key in data.keys():
-		    if data[key].ndim==1:
-			print key+" = "+str(data[key][pointId])
-		    elif data[key].ndim==2:
-			print key+"="+str(data[key][pointId,:])
-			if len(data[key][pointId,:])>10:
-			    from matplotlib import pyplot as plt
-			    plt.figure()
-			    plt.ion()			   
-			    plt.plot  (data[key][pointId,:])  
-			    plt.show()
 	    else:
 		print "picked somehing else than a point cloud"
-		associatedActorsActorIDs=[]
-		for p in self.pointClouds:
-		    for p2 in p['associatedActors']:
-			associatedActorsActorIDs.append(p2.GetAddressAsString(None) )		
+		#associatedActorsActorIDs=[]
+		#for p in self.pointClouds:
+		    #for p2 in p['associatedActors']:
+			#associatedActorsActorIDs.append(p2.GetAddressAsString(None) )			
+		pointId=None
+		idActorInList=None
+	return pointId,idActorInList
+		 
+    def myMiddleButtonEvent(self,obj, event):
+	pointId,idActorInList=self.pickPoint(event) 
+	if pointId!=None:
+	    self.lastPickedPoint=(pointId,idActorInList)
+	    data=self.pointClouds[idActorInList]['data']
+	    for key in data.keys():
+		if data[key].ndim==1:
+		    print key+" = "+str(data[key][pointId])
+		elif data[key].ndim==2:
+		    print key+"="+str(data[key][pointId,:])
+		    if len(data[key][pointId,:])>10:
+			pass
+			#from matplotlib import pyplot as plt
+			#plt.figure()
+			#plt.ion()			   
+			#plt.plot  (data[key][pointId,:])  
+			#plt.show()
+		
+	   	
 		
     def openFileGui(self):
 
