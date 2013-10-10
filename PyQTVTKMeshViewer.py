@@ -928,6 +928,44 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
     
 
 
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+import matplotlib.pyplot as plt
+
+import random
+
+class WindowPlot(QtGui.QDialog):
+    # from http://stackoverflow.com/questions/12459811/how-to-embed-matplotib-in-pyqt-for-dummies
+    def __init__(self, parent=None):
+	super(WindowPlot, self).__init__(parent)
+
+	# a figure instance to plot on
+	self.figure = plt.figure()
+
+	# this is the Canvas Widget that displays the `figure`
+	# it takes the `figure` instance as a parameter to __init__
+	self.canvas = FigureCanvas(self.figure)
+
+	# this is the Navigation widget
+	# it takes the Canvas widget and a parent
+	#self.toolbar = NavigationToolbar(self.canvas, self)
+
+	# Just some button connected to `plot` method
+	#self.button = QtGui.QPushButton('Plot')
+	#self.button.clicked.connect(self.plot)
+
+	# set the layout
+	layout = QtGui.QVBoxLayout()
+	#layout.addWidget(self.toolbar)
+	layout.addWidget(self.canvas)	
+	self.setLayout(layout)
+	
+
+    def getFigure(self):
+	return self.figure
+    def refresh(self):
+	# refresh canvas
+	self.canvas.draw()
 
 
 class Example(QtGui.QMainWindow):
@@ -947,6 +985,8 @@ class Example(QtGui.QMainWindow):
 	self.viewWidget.iren.AddObserver("MiddleButtonPressEvent", self.myMiddleButtonEvent)
 	self.viewWidget.iren.AddObserver("KeyPressEvent", self.myKeyPressedCallback)
 	
+	self.windowPlot=WindowPlot()
+	self.viewWidget.gridlayout.addWidget(self.windowPlot, 1, 0)
 	
         #self.statusBar()
 
@@ -1068,10 +1108,10 @@ class Example(QtGui.QMainWindow):
 				raise
 			image=(data[key][pointId,:]).reshape(image_width+1,2*image_width+1) 
 			from matplotlib import pyplot as plt
-			plt.figure()
-			plt.ion()
-			plt.imshow  (image[:,::-1].T )
-			
+			fig=self.windowPlot.getFigure()
+			ax =fig.add_subplot(111)
+			ax.imshow  (image[:,::-1].T )
+			self.windowPlot.refresh()
 			
 			     
 		
