@@ -997,7 +997,8 @@ class Example(QtGui.QMainWindow):
 	if obj.GetKeyCode()=='d':
 	    pointId,idActorInList=self.lastPickedPoint
 	    if  pointId!=None:
-		pickedPointDescriptor=self.pointClouds[idActorInList]['data']['shot'][pointId,:]
+		
+		pickedPointDescriptor=self.pointClouds[idActorInList]['data'][self.field_to_compare][pointId,:]
 		for p in self.pointClouds:
 		    actor= p['pointsActor']
 		    mapper=actor.GetMapper()
@@ -1005,12 +1006,14 @@ class Example(QtGui.QMainWindow):
 		    points=p['points'].reshape(-1,3)
 		    nbpoints=points.shape[0]
 		    
-		    diff=p['data']['shot']-pickedPointDescriptor
+		    diff=p['data'][self.field_to_compare]-pickedPointDescriptor
 		    dist=numpy.sqrt(numpy.sum(diff**2,axis=1))
 		    threshold=1.
 		    dist=numpy.minimum(dist,threshold)
 		    color_grey=(255*dist/threshold).astype(int)
 		    colors=numpy.column_stack((color_grey,color_grey,color_grey))
+		    best=numpy.argmin(dist)
+		    colors[best,:]=numpy.array([255,0,0])
 		    vtkcolors=numpyArrayToVtkUnsignedCharArray(colors)
 		    poly.GetPointData().SetScalars(vtkcolors)
 		    self.viewWidget.renWin.Render()
@@ -1047,6 +1050,32 @@ class Example(QtGui.QMainWindow):
 		    print key+" = "+str(data[key][pointId])
 		elif data[key].ndim==2:
 		    print key+"="+str(data[key][pointId,:])
+		    if key=='spinimage':
+			# display spin image computed by pcl using  pcl::SpinImageEstimation
+			# by lookign into the code http://docs.pointclouds.org/trunk/spin__image_8hpp_source.html
+			# we can see that the spin image has size  image_width_+1 by  2*image_width_+1
+			
+			image_width=1
+			s=len(data[key][pointId,:])
+			while True:
+			    v= (image_width+1)*(2*image_width+1)
+			    if v<s:
+				image_width+=1
+			    elif v==s:
+				break
+			    else: 
+				print "unvalid size"
+				raise
+			image=(data[key][pointId,:]).reshape(image_width+1,2*image_width+1) 
+			from matplotlib import pyplot as plt
+			plt.figure()
+			plt.ion()
+			plt.imshow  (image[:,::-1].T )
+			
+			
+			     
+		
+		      		    
 		    if len(data[key][pointId,:])>10:
 			pass
 			#from matplotlib import pyplot as plt
@@ -1139,6 +1168,7 @@ class Example(QtGui.QMainWindow):
 			    colors[:,2]=colors[:,0]
 			    vtk_colors=numpyArrayToVtkUnsignedCharArray(colors)
 			else :
+			    self.field_to_compare=key
 			    continue
 			
 			
