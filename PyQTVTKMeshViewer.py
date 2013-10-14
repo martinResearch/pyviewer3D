@@ -84,7 +84,8 @@ class labellingPanelWidget(QtGui.QWidget):
 		#radioGroup.buttonClicked[QtGui.QAbstractButton].connect(self.callback)
 		self.setLayout(vbox)
     def callback(self,id):
-	self.function(id)
+	if self.function!=[]:
+	    self.function(id)
 
 
 
@@ -172,7 +173,10 @@ class vtkMeshWidget ():
 	
 	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[-1,0,0])
 	self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,-1,0])
-	self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,-1])		
+	self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,-1])	
+	self.resetCuttingPlanes()
+	self.refreshCuttingPLanes()	
+	self.renWin.Render()
     def SetInteractorStyle(self,style):
 	if style=='Terrain':
 	    self.iren.SetInteractorStyle(vtk.vtkInteractorStyleTerrain())
@@ -188,6 +192,7 @@ class vtkMeshWidget ():
         if idcell!=[]:
             print 'picked cell '+str(idcell) + 'on actor '+ str(idactor)
             self.lastPickedPoint=point
+	    
 
     def Keypressed(self,obj, event):
         print "coucou"
@@ -509,6 +514,13 @@ class vtkMeshWidget ():
         self.renWin.Render()
 	return actor.GetAddressAsString(None)
     
+    
+    def plotCoordinateSystem(self,scale=1):
+	axisX=self.plotVectorField(numpy.array([[0,0,0]]),numpy.array([[1,0,0]]),color=[1,0,0],scale=scale,AddActor=True)
+	axisY=self.plotVectorField(numpy.array([[0,0,0]]), numpy.array([[0,1,0]]),color=[0,1,0],scale=scale,AddActor=True)
+	axisZ=self.plotVectorField(numpy.array([[0,0,0]]), numpy.array([[0,0,1]]),color=[0,0,1],scale=scale,AddActor=True)
+	
+    
     def plotVectorField(self,points, directions,color=[1,0,0],scale=1,AddActor=True):
 	vtk_points = vtk.vtkPoints()
 	vtk_lines = vtk.vtkCellArray()
@@ -544,7 +556,7 @@ class vtkMeshWidget ():
 	    self.renWin.Render()	
 	return actor
 	
-    def plotPolyLines(self,listPolyLines,color=[0,0,0]):
+    def plotPolyLines(self,listPolyLines,color=[0,0,0],refresh=True):
 		# if the purpose is to display edges of polygons on top of the rendered polygon
 	        # this mighr not work very well due to z buffer conflicts
 	        # coudl have a looek at http://cgg-journal.com/2008-2/06/index.html
@@ -596,20 +608,21 @@ class vtkMeshWidget ():
 		actor.GetProperty().SetColor( color[0], color[1], color[1] )
 
 		self.ren.AddActor(actor)
-
+		
 
 
 		### Avoid z-buffer fighting
 		vtk.vtkPolyDataMapper().SetResolveCoincidentTopologyToPolygonOffset()# polygon offSet parameters are shared by all the mappers
 
-
-		if self.ren.GetActors().GetNumberOfItems()==1:
-		    self.recenterCamera()
-
-
-		self.resetCuttingPlanes()
-		self.refreshCuttingPLanes()
-		self.renWin.Render()
+		if refresh:
+		    if self.ren.GetActors().GetNumberOfItems()==1:
+			self.recenterCamera()
+			
+			
+		    self.resetCuttingPlanes()
+		    self.refreshCuttingPLanes()
+		    self.renWin.Render()
+		return actor
     def recenterCamera(self):
 	self.sceneWidth=max(self.box[:,1]-self.box[:,0])
 	self.center=0.5*(self.box[:,1]+self.box[:,0])
@@ -731,14 +744,17 @@ class vtkMeshWidget ():
             p3D=p.GetPoint(0)
 
             pickedActorId=cellPicker.GetActor().GetAddressAsString(None)
+	    #actor=cellPicker.GetActor()
+	    #actor.SetVisibility(False)
             #cells=actor.GetMapper().GetInput().GetPolys()
-            #cellsData=cells=actor.GetMapper().GetInput().GetCellData()
+            #cellsData=actor.GetMapper().GetInput().GetCellData()
+	    #colors=cellsData.GetScalars()
             #idList = vtk.vtkIdList()
             #cells.GetNumberOfCells()
             #data=cells.GetData()
             #face=[]
             #for i in range(3):
-                #face.append(data.GetValue(4*pickedCellId+i+1))
+            #    face.append(data.GetValue(4*pickedCellId+i+1))
 
             #plotSurface(self,points,faces,faceColors=[[0,0,1]])
 
@@ -753,7 +769,7 @@ class vtkMeshWidget ():
         return pickedCellId,p3D,pickedActorId
 
 
-    def addLabelingPanel(self,listLabels,function,position):
+    def addLabelingPanel(self,listLabels,function=[],position=1):
 
 	    self. labellingPanel=labellingPanelWidget(listLabels,function)
 
@@ -775,7 +791,7 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 	self.AddObserver("RightButtonReleaseEvent",  self.ButtonEvent)
 	self.AddObserver("KeyPressEvent", self.KeyEvent)
 	self.AddObserver("KeyReleaseEvent", self.KeyEvent)
-	
+	self.rotationspeed=0.5
 	self.Rotating = 0
 	self.Panning  = 0
 	self.Zooming  = 0
@@ -827,13 +843,13 @@ class MyInteractorStyle(vtk.vtkInteractorStyle):
 		    
 		    actor.GetPosition()		
 		    actor.GetOrientation()
-		    actor.RotateZ(lastX-x)
+		    actor.RotateZ(self.rotationspeed*(lastX-x))
 		    #actor.RotateY(lastY-y)
 		    renWin.Render()	
 		else:
 		   	
-		    camera.Azimuth(lastX-x)
-		    camera.Elevation(lastY-y)
+		    camera.Azimuth(self.rotationspeed*(lastX-x))
+		    camera.Elevation(self.rotationspeed*(lastY-y))
 		    #camera.OrthogonalizeViewUp()	 
 		    camera.SetViewUp((0.0,0.0,1.0))
 		    renWin.Render()		    
@@ -1005,7 +1021,8 @@ class Example(QtGui.QMainWindow):
         self.show()
 	
 	self.pointClouds=[]
-	
+	self.pickingActor=self.viewWidget.plotPoints([[0,0,0]])
+	self.pickingActor.SetPickable(False)
 
 	
     def myWheelCallback(self,a,eventName):
@@ -1021,6 +1038,7 @@ class Example(QtGui.QMainWindow):
 			pointSize=1
     
 		mapper=pointsActor.GetProperty().SetPointSize( pointSize)
+	    self.pickingActor.GetProperty().SetPointSize( pointSize+2)
 	    self.viewWidget.renWin.Render()
 	    
     def myKeyPressedCallback(self,obj,eventName): 
@@ -1051,12 +1069,35 @@ class Example(QtGui.QMainWindow):
 		    threshold=1.
 		    dist=numpy.minimum(dist,threshold)
 		    color_grey=(255*dist/threshold).astype(int)
-		    colors=numpy.column_stack((color_grey,color_grey,color_grey))
+		    colors=numpy.column_stack((color_grey,color_grey,color_grey))		   
 		    best=numpy.argmin(dist)
+		    print "min dist= " +str(dist[best])
 		    colors[best,:]=numpy.array([255,0,0])
 		    vtkcolors=numpyArrayToVtkUnsignedCharArray(colors)
 		    poly.GetPointData().SetScalars(vtkcolors)
 		    self.viewWidget.renWin.Render()
+	if obj.GetKeyCode()=='a':
+	    # import pyflann # automaticallt installed  whiles installing the flann library?
+	    import cv2
+	    descriptors1= self.pointClouds[0]['data'][self.field_to_compare]
+	    flann_params = dict(algorithm=1, trees=4)
+	    # exemple of flann use from opencv http://jayrambhia.com/blog/sift-keypoint-matching-using-python-opencv/
+	    flann = cv2.flann_Index(descriptors1, flann_params)
+	    descriptors2= self.pointClouds[1]['data'][self.field_to_compare]
+	    idx, dist = flann.knnSearch(descriptors2, 2, params={})
+	    # ransac
+	    #take the 20 best matches
+	    keepbool=(dist[:,1]<0.05) & (dist[:,0]<0.75*dist[:,1])
+	    keep=numpy.nonzero( keepbool)[0]
+	    p1=self.pointClouds[0]['points'].reshape(-1,3)[idx[ keep,0].reshape(-1),:]
+	    self.viewWidget.plotVectorField(p1,self.pointClouds[1]['points'].reshape(-1,3)[keep,:]-p1)
+	    # take randomly two matches (we suppose the z axis valid)
+	    # measure their distance in the taget and source, if the distance is valid , compute a ransform the second point cloud , and compute 
+	    # an approximate distance btween the two point cloud after using that transform on the second point cloud
+	    # by taking a subset of the scene point and find their nearest neigbors in the object?
+	  	    
+	    
+	    
 				   	
 	
     def pickPoint(self,event):
@@ -1078,6 +1119,10 @@ class Example(QtGui.QMainWindow):
 			#associatedActorsActorIDs.append(p2.GetAddressAsString(None) )			
 		pointId=None
 		idActorInList=None
+		
+	if pointId!=None:
+	    self.pickingActor.SetPosition(point[0],point[1],point[2])
+	self.viewWidget.renWin.Render()
 	return pointId,idActorInList
 		 
     def myMiddleButtonEvent(self,obj, event):
@@ -1208,7 +1253,8 @@ class Example(QtGui.QMainWindow):
 			    colors[:,2]=colors[:,0]
 			    vtk_colors=numpyArrayToVtkUnsignedCharArray(colors)
 			else :
-			    self.field_to_compare=key
+			    if key in ['spinimage','shot']:
+				self.field_to_compare=key
 			    continue
 			
 			
@@ -1300,8 +1346,8 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
     sys.exit(app.exec_())
 
 
