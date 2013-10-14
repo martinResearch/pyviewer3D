@@ -1023,7 +1023,7 @@ class Example(QtGui.QMainWindow):
 	self.pointClouds=[]
 	self.pickingActor=self.viewWidget.plotPoints([[0,0,0]])
 	self.pickingActor.SetPickable(False)
-
+	self.viewWidget.plotCoordinateSystem(1)
 	
     def myWheelCallback(self,a,eventName):
 	if self.pointClouds!=[]:
@@ -1346,8 +1346,8 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
-    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
-    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
     sys.exit(app.exec_())
 
 
