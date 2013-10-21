@@ -53,11 +53,13 @@ class reader(generic.reader):
 					for line in fm:
 						line.strip()					
 						
-						
+						fields = line.split()
 						if line.startswith("#"):
 							pass
+						elif len(fields )==0:#empty line
+							pass										
 						elif line.startswith("newmtl"):
-							fields = line.split()
+							
 							fields.pop(0)
 							
 							if material_name!='':
@@ -71,12 +73,12 @@ class reader(generic.reader):
 							
 							
 						else :	
-							fields = line.split()
+							
 							attrname=fields.pop(0)	
 							if attrname in ['Kd','Ka','Ks','Tr','d','D']:
 								material[attrname]=[float(f) for f in fields]
 							elif attrname in ['Ns']:      
-								material[attrname]=[int(f) for f in fields]			
+								material[attrname]=[float(f) for f in fields]			
 					self.materialsDict[material_name]=material		
 		except IOError:
 			return	
@@ -88,7 +90,8 @@ class reader(generic.reader):
 		nodeCounter = 0
 		self.materialsDict={}	
 		materialId=0
-		groupId=-1
+		groupId=0
+		hasgroupIds=False
 		self.groupNames=[]
 		if len(self.materialsDict)==0:
 			self.readMaterials()
@@ -115,8 +118,10 @@ class reader(generic.reader):
 						cleanedFields.append(f)
 					
 					yield generic.indexedElement("Tri3", cleanedFields, label=str(elementCounter),materialId=materialId,groupId=groupId)
-				elif line.startswith("g"):					
-					groupId+=1
+				elif line.startswith("g"):
+					if hasgroupIds:
+						groupId+=1
+					hasgroupIds=True
 					self.groupNames.append(line[2:].strip())
 				elif line.startswith("usemtl"):
 					fields = line.split()					
