@@ -569,22 +569,23 @@ class vtkMeshWidget ():
 
 		idp=0
 		for polyLine in listPolyLines:
-		    vtkPolyLine=vtk.vtkPolyLine()
-		    vtkPolyLine.GetPointIds().SetNumberOfIds(len(polyLine)+1);
-		    for i, p in enumerate(polyLine):
+		    if len(polyLine)>0:
+			vtkPolyLine=vtk.vtkPolyLine()
+			vtkPolyLine.GetPointIds().SetNumberOfIds(len(polyLine)+1);
+			for i, p in enumerate(polyLine):
+			    vtk_points.InsertNextPoint(p[0],p[1],p[2])
+			    vtkPolyLine.GetPointIds().SetId(i,idp)
+			    idp+=1
+			    self.box[:,0]=numpy.minimum(self.box[:,0],p)
+			    self.box[:,1]=numpy.maximum(self.box[:,1],p)
+			p =polyLine[0]
 			vtk_points.InsertNextPoint(p[0],p[1],p[2])
+    
+			i=len(polyLine)
 			vtkPolyLine.GetPointIds().SetId(i,idp)
 			idp+=1
-			self.box[:,0]=numpy.minimum(self.box[:,0],p)
-			self.box[:,1]=numpy.maximum(self.box[:,1],p)
-		    p =polyLine[0]
-		    vtk_points.InsertNextPoint(p[0],p[1],p[2])
-
-		    i=len(polyLine)
-		    vtkPolyLine.GetPointIds().SetId(i,idp)
-		    idp+=1
-
-		    vtk_lines.InsertNextCell(vtkPolyLine)
+    
+			vtk_lines.InsertNextCell(vtkPolyLine)
 
 
 		poly = vtk.vtkPolyData()
