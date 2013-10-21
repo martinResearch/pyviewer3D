@@ -28,18 +28,48 @@ class Point():
     def __init__(self,coord,color=[]):
         self.coord=coord
         self.color=color
+	
+	
+	
+class AnimatedCuttingPlane():
+    def __init__(self,direction):
+	self.direction=direction
+	self.cuttingplaneVtk= vtk.vtkPlane()
+	self.cuttingplaneVtk.SetOrigin(0,0,0)
+	self.cuttingplaneVtk.SetNormal(direction[0], direction[1], direction[2])  # keep everything in direction of normal	
 
 class CutingPlanesWidget(QtGui.QWidget):
     def __init__(self,viewWidget):
 	    super(CutingPlanesWidget, self).__init__()
-	    vbox = QtGui.QVBoxLayout()
-	    self.xSlider = self.createSlider(viewWidget.setXCuttingPlane)
-	    self.ySlider = self.createSlider(viewWidget.setYCuttingPlane)
-	    self.zSlider = self.createSlider(viewWidget.setZCuttingPlane)
-	    vbox.addWidget(self.xSlider)
-	    vbox.addWidget(self.ySlider)
-	    vbox.addWidget(self.zSlider)
-	    self.setLayout(vbox)
+	    box =QtGui.QGridLayout()
+	  
+	    self.xmaxSlider = self.createSlider(lambda value: viewWidget.setCuttingPlane(viewWidget.cuttingPlaneXmax,value))
+	    self.ymaxSlider = self.createSlider(lambda value: viewWidget.setCuttingPlane(viewWidget.cuttingPlaneYmax,value))
+	    self.zmaxSlider = self.createSlider(lambda value: viewWidget.setCuttingPlane(viewWidget.cuttingPlaneZmax,value))
+	    self.xminSlider = self.createSlider(lambda value: viewWidget.setCuttingPlane(viewWidget.cuttingPlaneXmin,value))
+	    self.yminSlider = self.createSlider(lambda value: viewWidget.setCuttingPlane(viewWidget.cuttingPlaneYmin,value))
+	    self.zminSlider = self.createSlider(lambda value: viewWidget.setCuttingPlane(viewWidget.cuttingPlaneZmin,value))
+	    
+	    
+	    self.xminSlider.setValue(0)
+	    self.xmaxSlider.setValue(0)	    
+	    box.addWidget(self.xminSlider,0,0)
+	    box.addWidget(self.xmaxSlider,0,1)
+	    
+	   
+	    self.yminSlider.setValue(0)
+	    self.ymaxSlider.setValue(0)	   	    
+	    box.addWidget(self.yminSlider,1,0)
+	    box.addWidget(self.ymaxSlider,1,1)
+	   
+	    self.zminSlider.setValue(0)
+	    self.zmaxSlider.setValue(0)	   	   
+	    box.addWidget(self.zminSlider,2,0)
+	    box.addWidget(self.zmaxSlider,2,1)
+	    
+	  
+	    
+	    self.setLayout(box)
 
 
     def createSlider(self, setterSlot): # coied from grbber.py example from pyside
@@ -166,14 +196,20 @@ class vtkMeshWidget ():
 	self.box[:,1]=-numpy.inf
 	self.boxWithOffset=numpy.zeros(shape=(3,2),dtype=float)
 
-    def AddCuttingPlanesWidget(self):
-	self.cutingPlanesWidget=CutingPlanesWidget(self)
-	self.gridlayout.addWidget(self.cutingPlanesWidget, 1, 0)
-        self.cuttingPlanesVtk = vtk.vtkPlaneCollection()
+    def AddCuttingPlanesWidget(self,position=(1,0)):
+	self.cuttingPlanesVtk = vtk.vtkPlaneCollection()
+	self.cuttingPlaneXmax=self.addCuttingPlane([0,0,0],[-1,0,0])
+	self.cuttingPlaneYmax=self.addCuttingPlane([0,0,0],[0,-1,0])
+	self.cuttingPlaneZmax=self.addCuttingPlane([0,0,0],[0,0,-1])
+	self.cuttingPlaneXmin=self.addCuttingPlane([0,0,0],[1,0,0])
+	self.cuttingPlaneYmin=self.addCuttingPlane([0,0,0],[0,1,0])
+	self.cuttingPlaneZmin=self.addCuttingPlane([0,0,0],[0,0,1])	
 	
-	self.cuttingPlaneX=self.addCuttingPlane([0,0,0],[-1,0,0])
-	self.cuttingPlaneY=self.addCuttingPlane([0,0,0],[0,-1,0])
-	self.cuttingPlaneZ=self.addCuttingPlane([0,0,0],[0,0,-1])	
+	self.cutingPlanesWidget=CutingPlanesWidget(self)
+	self.gridlayout.addWidget(self.cutingPlanesWidget, position[0], position[1])
+       
+	
+
 	self.resetCuttingPlanes()
 	self.refreshCuttingPLanes()	
 	self.renWin.Render()
@@ -381,13 +417,13 @@ class vtkMeshWidget ():
 	actor.SetOrigin(actor.GetCenter())
         #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
         # how do we rander disk instead of small square  for the points ?!
-
+	self.updateBoxWithOffset()
 	if AddActor:
 	    self.ren.AddActor(actor)
     
 	    if self.ren.GetActors().GetNumberOfItems()==1:
 		self.recenterCamera()
-	    self.updateBoxWithOffset()
+	    
 	    self.resetCuttingPlanes()
 	    self.refreshCuttingPLanes()
 	    self.renWin.Render()
@@ -649,28 +685,30 @@ class vtkMeshWidget ():
 
     def resetCuttingPlanes(self):
 	if  self.cuttingPlanes!=[]:
-	    self.setXCuttingPlane(self.cutingPlanesWidget.xSlider.value())
-	    self.setYCuttingPlane(self.cutingPlanesWidget.ySlider.value())
-	    self.setZCuttingPlane(self.cutingPlanesWidget.zSlider.value())
+	    self.setCuttingPlane(self.cuttingPlaneXmax,self.cutingPlanesWidget.xmaxSlider.value())
+	    self.setCuttingPlane(self.cuttingPlaneYmax,self.cutingPlanesWidget.ymaxSlider.value())
+	    self.setCuttingPlane(self.cuttingPlaneZmax,self.cutingPlanesWidget.zmaxSlider.value())
+	    self.setCuttingPlane(self.cuttingPlaneXmin,self.cutingPlanesWidget.xminSlider.value())
+	    self.setCuttingPlane(self.cuttingPlaneYmin,self.cutingPlanesWidget.yminSlider.value())
+	    self.setCuttingPlane(self.cuttingPlaneZmin,self.cutingPlanesWidget.zminSlider.value())
+	    
 
 
-    def setXCuttingPlane(self,value):
+    def setCuttingPlane(self,cuttingPlane,value):
 	pass
 	v1=1-float(value)/1000
 	v2=float(value)/1000
-	self.cuttingPlaneX.SetOrigin(self.boxWithOffset[0,0]*v1+self.boxWithOffset[0,1]*v2, 0, 0)
+	
+	t=[(0,0,0),(0,0,1),(0,1,0),(0,1,1),(1,0,0),(1,0,1),(1,1,0),(1,1,1)]
+	boxcorners=[]
+	for k in t:
+	    boxcorners.append([self.boxWithOffset[i,k[i]] for i in range(3)])
+	v=numpy.array(boxcorners).dot(cuttingPlane.direction)
+	origin=numpy.array(cuttingPlane.direction)*(v.min()*v1+(v.max()-v.min())*v2)
+	
+	cuttingPlane.cuttingplaneVtk.SetOrigin(origin[0],origin[1],origin[2])
 	self.renWin.Render() #seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
-    def setYCuttingPlane(self,value):
-	v1=1-float(value)/1000
-	v2=float(value)/1000
-	self.cuttingPlaneY.SetOrigin(0, self.boxWithOffset[1,0]*v1+self.boxWithOffset[1,1]*v2, 0)
-	self.renWin.Render()#seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
-    def setZCuttingPlane(self,value):
-	v1=1-float(value)/1000
-	v2=float(value)/1000
-	self.cuttingPlaneZ.SetOrigin(0, 0, self.boxWithOffset[2,0]*v1+self.boxWithOffset[2,1]*v2)
-	self.renWin.Render()#seems to be needed otherwise it doesn't  refresh well the 3D display, but slow down refreshment of the slider itself :(
-
+ 
     def refreshCuttingPLanes(self):
 	if  self.cuttingPlanes!=[]:
 	    actors=self.ren.GetActors()
@@ -689,18 +727,13 @@ class vtkMeshWidget ():
         # clipper = vtk.vtkClipPolyData()
         #cutter.SetCutFunction(plane)
 
-        cuttingplane= vtk.vtkPlane()
+        cuttingplane= AnimatedCuttingPlane(normal)
 
-        cuttingplane.SetOrigin(origin[0], origin[1], origin[2])
-        cuttingplane.SetNormal(normal[0], normal[1], normal[2])  # keep everything in direction of normal
+      
 
 
-        self.cuttingPlanesVtk.AddItem(cuttingplane)
-	self.cuttingPlanes=[]
-	self.cuttingPlanesVtk.InitTraversal()
-	for i in range(self.cuttingPlanesVtk.GetNumberOfItems()):
-		self.cuttingPlanes.append(self.cuttingPlanesVtk.GetNextItem())
-
+        self.cuttingPlanesVtk.AddItem(cuttingplane.cuttingplaneVtk)
+	self.cuttingPlanes.append(cuttingplane)	
 
         self.refreshCuttingPLanes()
 
@@ -1349,6 +1382,7 @@ def main():
     ex = Example()
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
+    ex.viewWidget.AddCuttingPlanesWidget((1,1))
     sys.exit(app.exec_())
 
 
