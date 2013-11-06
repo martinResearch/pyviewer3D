@@ -1213,11 +1213,16 @@ class Example(QtGui.QMainWindow):
     def openFile(self,fname):
 
         suffix = fname[fname.rindex("."):].lower()
-	if suffix=='.pcd' or suffix=='.ply':
+	if suffix=='.pcd' or suffix=='.ply' or suffix=='.ptx':
 	    # this is a point cloud
 	    import pointCloudIO
 	    if suffix=='.pcd':
 		points,colors, data,maps=pointCloudIO.loadPCD(fname,default_color=(numpy.random.rand(3)*200+50).astype(int))
+		
+	    if suffix=='.ptx':
+		points,colors,transform=pointCloudIO.loadPTX(fname)	
+		data={}
+		colors=colors.reshape((-1,3))
 	    elif suffix=='.ply':
 		points,colors, data=pointCloudIO.loadPLY(fname)
 		maps=dict()
@@ -1380,8 +1385,12 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii_camera_centers.ptx')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii.pcd')
+    
+   
     ex.viewWidget.AddCuttingPlanesWidget((1,1))
     sys.exit(app.exec_())
 

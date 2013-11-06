@@ -3,7 +3,9 @@ from  camera import RigidTransform3D
 
 def savePTX(transform,points,filename):
 	"""export data to the leica ptx format"""
+	
 	with open(filename, 'w') as f:
+		assert points.shape[2]==3
 		f.write(str(points.shape[0])+'\n')
 		f.write(str(points.shape[1])+'\n')
 		np.savetxt(f,transform.get_translation().reshape([1,3]),'%.5f')
