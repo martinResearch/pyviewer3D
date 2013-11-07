@@ -143,6 +143,11 @@ class vtkMeshWidget ():
 	if single_window:
 	    self.vtkWidget = QVTKRenderWindowInteractor(self.centralWidget)
 	    self.gridlayout.addWidget(self.vtkWidget, 0, 0)
+	    #self.gridlayout.setRowStretch(0, 0); 
+	    #self.gridlayout.setColumnStretch(0, 0); 
+	    #dock = QtGui.QDockWidget()
+	    #dock.setWidget(self.vtkWidget)
+	    #MainWindow.addDockWidget(QtCore.Qt.RightDockWidgetArea,dock )
 	    MainWindow.statusBar() # for some reason this line is necessary to avoid a silent crash on linux when executing self.renWin.Render()
 	else:
 	    self.vtkWidget = QVTKRenderWindowInteractor()
@@ -346,7 +351,7 @@ class vtkMeshWidget ():
 
 
 
-    def plotPoints(self,points,colors=[],AddActor=True):
+    def plotPoints(self,points,colors=[],AddActor=True,pointSize=5):
 
         # look here for vtk examples in python http://www.vtk.org/Wiki/VTK/Examples/Python
 
@@ -413,7 +418,7 @@ class vtkMeshWidget ():
         actor.GetProperty().SetColor( 0., 0., 1. )
         actor.GetProperty().SetLineWidth(0)
         actor.GetProperty().SetRepresentationToPoints
-        actor.GetProperty().SetPointSize( 5)
+        actor.GetProperty().SetPointSize( pointSize)
 	actor.SetOrigin(actor.GetCenter())
         #actor.GetProperty().SetMarkerStyle(vtk.vtkPlotPoints.CIRCLE);# does not work ,found on http://www.itk.org/Wiki/VTK/Examples/Cxx/Plotting/ScatterPlot
         # how do we rander disk instead of small square  for the points ?!
@@ -1053,26 +1058,28 @@ class Example(QtGui.QMainWindow):
         self.setGeometry(300, 300, 350, 300)
         self.setWindowTitle('File dialog')
         self.show()
-	
+	self.pointSize=5
 	self.pointClouds=[]
 	self.pickingActor=self.viewWidget.plotPoints([[0,0,0]])
+	self.pickingActor.GetProperty().SetPointSize(self.pointSize+2)
 	self.pickingActor.SetPickable(False)
 	self.viewWidget.plotCoordinateSystem(1)
+	
 	
     def myWheelCallback(self,a,eventName):
 	if self.pointClouds!=[]:
 	    for pointCloud in self.pointClouds:
 		pointsActor=pointCloud['pointsActor']
-		pointSize=pointsActor.GetProperty().GetPointSize()
+		#pointSize=pointsActor.GetProperty().GetPointSize()
 		if eventName=='MouseWheelForwardEvent':
-		    pointSize=pointSize+1
+		    self.pointSize=self.pointSize+1
 		else:
-		    pointSize=pointSize-1
-		    if pointSize<1:
-			pointSize=1
+		   self.pointSize=self.pointSize-1
+		   if self.pointSize<1:
+			self.pointSize=1
     
-		mapper=pointsActor.GetProperty().SetPointSize( pointSize)
-	    self.pickingActor.GetProperty().SetPointSize( pointSize+2)
+		mapper=pointsActor.GetProperty().SetPointSize( self.pointSize)
+	    self.pickingActor.GetProperty().SetPointSize( self.pointSize+2)
 	    self.viewWidget.renWin.Render()
 	    
     def myKeyPressedCallback(self,obj,eventName): 
@@ -1232,7 +1239,7 @@ class Example(QtGui.QMainWindow):
 	    
 	    if points!=[]:
 		ass=vtk.vtkAssembly()
-		pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)),AddActor=False)
+		pointsActor=self.viewWidget.plotPoints(points.reshape((-1,3)),colors=colors.reshape((-1,3)),AddActor=False,pointSize=self.pointSize)
 		ass.AddPart(pointsActor)
 		vtkcolors_fields=dict()
 		adding_data_to_point_cloud=False
@@ -1385,12 +1392,17 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
-    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
-    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii_camera_centers.ptx')
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii.pcd')
+    # ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_keypoints.pcd')
     
-   
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_spinimage.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_keypoints.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_spinimage.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii_camera_centers.ptx')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii.pcd')
+    
+ 
     ex.viewWidget.AddCuttingPlanesWidget((1,1))
     sys.exit(app.exec_())
 
