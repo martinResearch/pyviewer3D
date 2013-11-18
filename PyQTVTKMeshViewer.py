@@ -23,6 +23,14 @@ import OpenGL.arrays.vbo as glvbo
 import vtk
 from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
+def exactNN(a,b):
+    idx=numpy.empty(len(a),dtype=numpy.int)
+    distSquared=numpy.empty(len(a),dtype=numpy.float)
+    for i,p in enumerate(a): 
+	d=numpy.sum((b-p)**2,axis=1)
+	idx[i]=numpy.argmin(d)
+	distSquared[i]=d[idx[i]]
+    return idx,distSquared	
 
 class Point():
     def __init__(self,coord,color=[]):
@@ -1137,11 +1145,134 @@ class Example(QtGui.QMainWindow):
 	    # measure their distance in the taget and source, if the distance is valid , compute a ransform the second point cloud , and compute 
 	    # an approximate distance btween the two point cloud after using that transform on the second point cloud
 	    # by taking a subset of the scene point and find their nearest neigbors in the object?
-	  	    
+	  
+	if obj.GetKeyCode()=='i':
+	    # brute force alignement
 	    
-	    
-				   	
+	    self.pointClouds[1]['points']
+	    self.pointClouds[0]['points']
+	    self.pointClouds[1]['pointsActor']	
+	    OriginSource=numpy.array(self.pointClouds[1]['assemblyActor'].GetOrigin())
+	    OriginTarget=numpy.array(self.pointClouds[0]['assemblyActor'].GetOrigin())
 	
+	    translationAlignOrigins = (OriginTarget-OriginSource).flatten()	  
+	    
+	    #iterate over rotations
+	    import cv2	
+	    flann_params = dict(algorithm=1, trees=4)	 
+	    pointsTarget=self.pointClouds[0]['points'].reshape(-1,3)
+	    pointsSource=self.pointClouds[1]['points'].reshape(-1,3)
+	    pointsSourceCentered=pointsSource- OriginSource
+	    pointsTargetCentered=pointsTarget- OriginTarget
+	
+	    
+	    #flann = cv2.flann_Index(pointsTargetCentered, flann_params)
+	    from transformations import transformations
+	    n=100
+	    angles=numpy.linspace(0,2*numpy.pi,n+1)[:-1]
+	    costs=numpy.empty(n)
+       
+	    for i,angle in enumerate(angles):
+		RT=transformations.compose_matrix(angles=[0,0,angle])
+		#transformations.rotation_matrix(angle, direction, point=None):
+		transformedPoints= (pointsSourceCentered.dot(RT[:3,:3].T)).astype(numpy.float32)		
+		#idx, distSquared = flann.knnSearch(transformedPoints, 1, params={})
+		idx,distSquared=exactNN(transformedPoints,pointsTargetCentered)
+		#dist=numpy.minimum(dist, 0.1)
+		costs[i]=sum( distSquared)
+		# take visibility into account ?
+	    iopt= numpy.argmin(costs)
+	    print "optimal cost="+str(costs[iopt])
+	    angleZ=angles[iopt]	 
+	    self.pointClouds[1]['assemblyActor'].SetPosition(translationAlignOrigins [0],translationAlignOrigins[1],translationAlignOrigins[2])
+	    self.pointClouds[1]['assemblyActor'].SetOrientation(0,0,angleZ*180/numpy.pi)
+	    self.viewWidget.renWin.Render()
+	   
+	    
+	if obj.GetKeyCode()=='o':
+	    print 'perform ICP from the existing pose'
+	    
+	    pointsTarget=self.pointClouds[0]['points'].reshape(-1,3)
+	    pointsSource=self.pointClouds[1]['points'].reshape(-1,3)
+	    use_centered=False
+	   
+	    OriginSource=numpy.array(self.pointClouds[1]['assemblyActor'].GetOrigin())
+	    OriginTarget=numpy.array(self.pointClouds[0]['assemblyActor'].GetOrigin())
+	    
+	    pointsSourceCentered=pointsSource-OriginSource
+	    pointsTargetCentered=pointsTarget-OriginTarget
+	    import cv2	
+	 
+	    import scipy
+	    from scipy import spatial
+	    kdtree=scipy.spatial.KDTree(pointsTargetCentered)
+	    
+	    angles=self.pointClouds[1]['assemblyActor'].GetOrientation()  
+	    translationRefined=self.pointClouds[1]['assemblyActor'].GetPosition()
+	    
+	    # 
+	    # selfq.pointClouds[1]['assemblyActor'].GetCenter()
+	    
+	    translationAlignBary= (OriginTarget-OriginSource).flatten()	 
+	    translation=translationRefined-translationAlignBary  
+	  
+	    angleZInit=angles[2]*numpy.pi/180
+	    #Iterative closests point
+	    from transformations import transformations
+	     
+	    def transfomPoints(angle_translation):
+		RT=transformations.compose_matrix(angles=[0,0,angle_translation[0]])
+		transformedPoints= (pointsSourceCentered.dot(RT[:3,:3].T)+angle_translation[1:]).astype(numpy.float32)	    
+		return transformedPoints
+	    def residuals(angle_translation,idx):
+		tp=transfomPoints(angle_translation)
+		return (tp-pointsTargetCentered[idx.flatten()]).flatten()
+	    def cost(angle_translation,idx):
+		transformedPoints=transfomPoints(angle_translation)
+		r=residuals(angle_translation,idx)
+		return numpy.sum(r**2)		
+
+	    
+	    
+	    import scipy.optimize as optimize
+	    
+	    
+	    angle_translation =numpy.array([angleZInit,translation[0],translation[1],translation[2]])    
+	    print angle_translation
+	    bestcost=numpy.inf
+	    for i in range(10): 
+		# update matchings
+		transformedPoints=transfomPoints(angle_translation)
+		#if use_centered:
+		#    idx, distSquared = flann.knnSearch(transformedPoints, 1, params={})
+		#if (not(use_centered) or (distSquared.sum()> bestcost)):		
+		    #flann failed atr providing better neighbors fro some points	
+		#print "flann failed"
+		idx,distSquared=exactNN(transformedPoints,pointsTargetCentered)
+		#idx=numpy.array(kdtree.query(transformedPoints)[1])# seels much slower !
+		newcost=cost(angle_translation,idx)
+		assert(bestcost>=newcost)
+		bestcost=newcost
+		print bestcost
+		# update rotation and translation
+		result = optimize.leastsq(residuals,angle_translation ,args=(idx),full_output=True)
+		angle_translation=result[0]
+		newcost=cost(angle_translation,idx)
+		assert(bestcost>=newcost-1e-6)
+		bestcost=newcost	
+		print bestcost
+		translationRefined=translationAlignBary +angle_translation[1:]
+		self.pointClouds[1]['assemblyActor'].SetPosition(translationRefined[0],translationRefined[1],translationRefined[2])
+		angle=angle_translation[0]
+		self.pointClouds[1]['assemblyActor'].SetOrientation(0,0,angle*180/numpy.pi)
+		self.viewWidget.renWin.Render()	
+	    print angle_translation
+		
+	   
+	    self.viewWidget.renWin.Render()
+	    #RT=transformations.compose_matrix(angles=[0,0,angle], translate=translation)
+	    
+	   
     def pickPoint(self,event):
 	(x,y) = self.viewWidget.iren.GetEventPosition()
 	self.viewWidget.renWin.Render()
@@ -1169,7 +1300,7 @@ class Example(QtGui.QMainWindow):
 		 
     def myMiddleButtonEvent(self,obj, event):
 	pointId,idActorInList=self.pickPoint(event) 
-	if pointId!=None:
+	if False:#pointId!=None:
 	    self.lastPickedPoint=(pointId,idActorInList)
 	    data=self.pointClouds[idActorInList]['data']
 	    for key in data.keys():
@@ -1393,16 +1524,18 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
-    ex.openFile('./data/scan.ptx')
-    # ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
+    
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_keypoints.pcd')
     
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_spinimage.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_spinimage.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene33_ascii.pcd')
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
+        
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_keypoints.pcd')
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_spinimage.pcd')
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii_camera_centers.ptx')
-    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii.pcd')
+   
     
  
     ex.viewWidget.AddCuttingPlanesWidget((1,1))
