@@ -557,12 +557,12 @@ class vtkMeshWidget ():
     
     
     def plotCoordinateSystem(self,scale=1):
-	axisX=self.plotVectorField(numpy.array([[0,0,0]]),numpy.array([[1,0,0]]),color=[1,0,0],scale=scale,AddActor=True)
-	axisY=self.plotVectorField(numpy.array([[0,0,0]]), numpy.array([[0,1,0]]),color=[0,1,0],scale=scale,AddActor=True)
-	axisZ=self.plotVectorField(numpy.array([[0,0,0]]), numpy.array([[0,0,1]]),color=[0,0,1],scale=scale,AddActor=True)
+	axisX=self.plotVectorField(numpy.array([[0,0,0]]),numpy.array([[1,0,0]]),color=[1,0,0],scale=scale,AddActor=True,linewidth=5)
+	axisY=self.plotVectorField(numpy.array([[0,0,0]]), numpy.array([[0,1,0]]),color=[0,1,0],scale=scale,AddActor=True,linewidth=5)
+	axisZ=self.plotVectorField(numpy.array([[0,0,0]]), numpy.array([[0,0,1]]),color=[0,0,1],scale=scale,AddActor=True,linewidth=5)
 	
     
-    def plotVectorField(self,points, directions,color=[1,0,0],scale=1,AddActor=True):
+    def plotVectorField(self,points, directions,color=[1,0,0],scale=1,AddActor=True,linewidth=1):
 	vtk_points = vtk.vtkPoints()
 	vtk_lines = vtk.vtkCellArray()
 	poly = vtk.vtkPolyData()
@@ -589,6 +589,7 @@ class vtkMeshWidget ():
 	actor.GetProperty().EdgeVisibilityOff()
 	actor.GetProperty().SetEdgeColor(1, 0,0)
 	actor.GetProperty().SetColor( color[0], color[1], color[2] )
+	actor.GetProperty().SetLineWidth(linewidth)
 	actor.SetOrigin(actor.GetCenter())
 	if AddActor:
 	    self.ren.AddActor(actor)				
@@ -597,7 +598,7 @@ class vtkMeshWidget ():
 	    self.renWin.Render()	
 	return actor
 	
-    def plotPolyLines(self,listPolyLines,color=[0,0,0],refresh=True):
+    def plotPolyLines(self,listPolyLines,color=[0,0,0],refresh=True,linewidth=1):
 		# if the purpose is to display edges of polygons on top of the rendered polygon
 	        # this mighr not work very well due to z buffer conflicts
 	        # coudl have a looek at http://cgg-journal.com/2008-2/06/index.html
@@ -648,7 +649,7 @@ class vtkMeshWidget ():
 		actor.GetProperty().EdgeVisibilityOff()
 		actor.GetProperty().SetEdgeColor(1, 0,0)
 		actor.GetProperty().SetColor( color[0], color[1], color[1] )
-
+		actor.GetProperty().SetLineWidth(linewidth)
 		self.ren.AddActor(actor)
 		
 
@@ -1392,6 +1393,7 @@ def main():
 
     app = QtGui.QApplication(sys.argv)
     ex = Example()
+    ex.openFile('./data/scan.ptx')
     # ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_keypoints.pcd')
     

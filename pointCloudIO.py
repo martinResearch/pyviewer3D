@@ -2,39 +2,48 @@ import numpy as np
 from  camera import RigidTransform3D
 
 def savePTX(transform,points,filename):
-	"""export data to the leica ptx format"""
+	"""export data to the leica ptx format
+	this format assumes that x is pointing up, 	
+	The points are listed one column after another from left to right and from top to botom in each column i.e
+	1 4 7 
+	2 5 8
+	3 6 9
+	"""
 	
 	with open(filename, 'w') as f:
 		assert points.shape[2]==3
-		f.write(str(points.shape[0])+'\n')
 		f.write(str(points.shape[1])+'\n')
+		f.write(str(points.shape[0])+'\n')
 		np.savetxt(f,transform.get_translation().reshape([1,3]),'%.5f')
-		np.savetxt(f,transform.get_rotation(),'%.5f')
-		np.savetxt(f,transform.Rt,'%.5f')
-		np.savetxt(f,transform.get_translation().reshape([1,3]),'%.5f')
-		for p in points.reshape([-1,3]):
-			np.savetxt(f,np.hstack((p,np.array([1,127,127,127]))).reshape([1,7]),'%.5f %.5f %.5f %d %d %d %d')
+		np.savetxt(f,transform.get_rotation().T,'%.5f')
+		M=np.zeros((4,4))
+		M[3,3]=1
+		M[:,:3]=transform.Rt.T
+		np.savetxt(f,M,'%.5f')
+		
+		for j in xrange(points.shape[1]):
+			for i in xrange(points.shape[0]):
+				p =points[points.shape[0]-i-1,j]
+				np.savetxt(f,np.hstack((p,np.array([1,127,127,127]))).reshape([1,7]),'%.5f %.5f %.5f %d %d %d %d')
 
 def loadPTX(filename):
 	with open(filename, 'r') as f:
 
-		nblines=int(f.readline())
-
 		nbcols=int(f.readline())
+		nblines=int(f.readline())
 		print nblines
 		print nbcols
 		points=np.empty((nblines,nbcols))
 		#np.loadtxt does not allow yet to specify a number of rows, np ticket 1731.
 		#http://np-discussion.10968.n7.nabble.com/using-loadtxt-for-given-number-of-rows-td3635.html
 		translation=np.fromfile(f, sep=' ', count=3)
-		rotation=np.fromfile(f, sep=' ', count=9).reshape(3,3)
+		rotation=np.fromfile(f, sep=' ', count=9).reshape(3,3).T
 		print rotation
-		Rt=np.fromfile(f, sep=' ', count=12).reshape(3,4)
-		translation=np.fromfile(f, sep=' ', count=3)
+		M=np.fromfile(f, sep=' ', count=16).reshape(4,4)		
 		transform=RigidTransform3D(rotation,translation,fix_rotation=True)
 		points_with_color=np.fromfile(f,  sep=' ',count=-1).reshape(-1,7)
-		points=points_with_color[:,:3].reshape((nblines,nbcols,3))
-		colors=points_with_color[:,4:7].reshape((nblines,nbcols,3)).astype(int)
+		points=np.transpose(points_with_color[:,:3].reshape((nbcols,nblines,3)),[1,0,2])[::-1,:,:]
+		colors=np.transpose(points_with_color[:,4:7].reshape((nbcols,nblines,3)).astype(int),[1,0,2])[::-1,:,:]
 		return points, colors , transform
 
 def savePCD(transform,points,filename,idpolys,polygons,idlabelToMaterial,labelColors):
