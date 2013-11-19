@@ -18,6 +18,8 @@ def IterativeClosestPoint(pointsSource,pointsTarget,initalTransform,nbitermax=10
     assert(pointsSource.shape[1]==3)
     assert(pointsTarget.shape[1]==3)
 
+    # could subsample scene first 
+    # could compute poit-to-convex patches distance
    
     
     sourceRotationCenter=pointsSource.mean(axis=0)
@@ -85,30 +87,30 @@ def IterativeClosestPoint(pointsSource,pointsTarget,initalTransform,nbitermax=10
     print angle_translation
     bestcost=numpy.inf
     for i in range(nbitermax): 
-                # update matchings
-                transformedPoints=transfomPoints(angle_translation)
-                prevDistSquared=(residuals(angle_translation,idx)**2).sum(axis=1)
-                idx, distSquared = flann.knnSearch(transformedPoints, 1, params={})
-                idx=idx.flatten()
-                # detect points where flann failed at providing a better match and perform brute force search for these points
-                wrongIds=numpy.nonzero(prevDistSquared<distSquared.flatten())[0]
-                if len(wrongIds)>0:
-                            idx[wrongIds]=exactNN(transformedPoints[wrongIds],pointsTarget)[0]
-                #idx=numpy.array(kdtree.query(transformedPoints)[1])# seels much slower !
-                newcost=cost(angle_translation,idx)
-                assert(bestcost>=newcost-1e-4)		
-                bestcost=newcost
-                print bestcost
-                # update rotation and translation
-                result = optimize.leastsq(residualsFlat,angle_translation ,args=(idx),full_output=True,epsfcn=1e-4)
-                angle_translation=result[0]
-                newcost=cost(angle_translation,idx)
-                assert(bestcost>=newcost-1e-4)
-                bestcost=newcost	
-                print bestcost
+        # update matchings
+        transformedPoints=transfomPoints(angle_translation)
+        prevDistSquared=(residuals(angle_translation,idx)**2).sum(axis=1)
+        idx, distSquared = flann.knnSearch(transformedPoints, 1, params={})
+        idx=idx.flatten()
+        # detect points where flann failed at providing a better match and perform brute force search for these points
+        wrongIds=numpy.nonzero(prevDistSquared<distSquared.flatten())[0]
+        if len(wrongIds)>0:
+                    idx[wrongIds]=exactNN(transformedPoints[wrongIds],pointsTarget)[0]
+        #idx=numpy.array(kdtree.query(transformedPoints)[1])# seels much slower !
+        newcost=cost(angle_translation,idx)
+        assert(bestcost>=newcost-1e-4)		
+        bestcost=newcost
+        print bestcost
+        # update rotation and translation
+        result = optimize.leastsq(residualsFlat,angle_translation ,args=(idx),full_output=True,epsfcn=1e-4)
+        angle_translation=result[0]
+        newcost=cost(angle_translation,idx)
+        assert(bestcost>=newcost-1e-4)
+        bestcost=newcost	
+        print bestcost
 
-                M=getMatrixFromParameters(angle_translation,sourceRotationCenter)
-                if visualizeFunc!=None:
-                    visualizeFunc(M)
+        M=getMatrixFromParameters(angle_translation,sourceRotationCenter)
+        if visualizeFunc!=None:
+            visualizeFunc(M)
               	
     return M
