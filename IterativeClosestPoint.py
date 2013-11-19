@@ -13,7 +13,7 @@ def exactNN(a,b):
     return idx,distSquared	
 
 
-def IterativeClosestPoint(pointsSource,pointsTarget,initalTransform,nbitermax=10,visualizeFunc=None,):
+def IterativeClosestPoint(pointsSource,pointsTarget,initalTransform,nbitermax=100,visualizeFunc=None,verbose=False,tol=1e-5):
     """implementation of iterative closests point that optimizes only with rotation around the z axis and the slatation in x and y """
     assert(pointsSource.shape[1]==3)
     assert(pointsTarget.shape[1]==3)
@@ -84,9 +84,13 @@ def IterativeClosestPoint(pointsSource,pointsTarget,initalTransform,nbitermax=10
     import scipy.optimize as optimize
     transformedPoints=transfomPoints(angle_translation)
     idx=exactNN(transformedPoints,pointsTarget)[0] # start with exact matching insead of flann base macgin in order to avoid increase of energy when starting from previous solution
-    print angle_translation
+    if verbose:
+        print 'initial parameters = '+str(angle_translation)
     bestcost=numpy.inf
+    
+    
     for i in range(nbitermax): 
+        
         # update matchings
         transformedPoints=transfomPoints(angle_translation)
         prevDistSquared=(residuals(angle_translation,idx)**2).sum(axis=1)
@@ -96,18 +100,28 @@ def IterativeClosestPoint(pointsSource,pointsTarget,initalTransform,nbitermax=10
         wrongIds=numpy.nonzero(prevDistSquared<distSquared.flatten())[0]
         if len(wrongIds)>0:
                     idx[wrongIds]=exactNN(transformedPoints[wrongIds],pointsTarget)[0]
+       
+            
+        
         #idx=numpy.array(kdtree.query(transformedPoints)[1])# seels much slower !
         newcost=cost(angle_translation,idx)
-        assert(bestcost>=newcost-1e-4)		
+        assert(bestcost>=newcost-1e-4)	
+        if bestcost<newcost+tol:
+            break        
+        
+        
         bestcost=newcost
-        print bestcost
+        if verbose:
+            print 'sum of squared error = '+str(bestcost)
         # update rotation and translation
         result = optimize.leastsq(residualsFlat,angle_translation ,args=(idx),full_output=True,epsfcn=1e-4)
         angle_translation=result[0]
         newcost=cost(angle_translation,idx)
         assert(bestcost>=newcost-1e-4)
         bestcost=newcost	
-        print bestcost
+       
+        if verbose:
+            print 'sum of squared error = '+str(bestcost)
 
         M=getMatrixFromParameters(angle_translation,sourceRotationCenter)
         if visualizeFunc!=None:
