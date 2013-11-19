@@ -24,7 +24,7 @@ import vtk
 from vtk.qt4.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 def exactNN(a,b):
-    idx=numpy.empty(len(a),dtype=numpy.int)
+    idx=numpy.empty(len(a),dtype=numpy.int32)
     distSquared=numpy.empty(len(a),dtype=numpy.float)
     for i,p in enumerate(a): 
 	d=numpy.sum((b-p)**2,axis=1)
@@ -1191,80 +1191,139 @@ class Example(QtGui.QMainWindow):
 	    
 	if obj.GetKeyCode()=='o':
 	    print 'perform ICP from the existing pose'
-	    
+	    from transformations import transformations
+	     
 	    pointsTarget=self.pointClouds[0]['points'].reshape(-1,3)
 	    pointsSource=self.pointClouds[1]['points'].reshape(-1,3)
 	    use_centered=False
-	   
-	    OriginSource=numpy.array(self.pointClouds[1]['assemblyActor'].GetOrigin())
-	    OriginTarget=numpy.array(self.pointClouds[0]['assemblyActor'].GetOrigin())
 	    
-	    pointsSourceCentered=pointsSource-OriginSource
-	    pointsTargetCentered=pointsTarget-OriginTarget
-	    import cv2	
-	 
+	    sourceActor=self.pointClouds[1]['assemblyActor']
+	   
+	    def getVtkTransform(actor):
+		"""checking the forumal for the VTK transfomation """
+		orientation_angles=numpy.array(actor.GetOrientation())
+		origin=numpy.array(actor.GetOrigin())
+		position=numpy.array(actor.GetPosition())		
+		T1=transformations.compose_matrix(translate=-origin)
+		R=transformations.compose_matrix(angles=orientation_angles*numpy.pi/180)
+		T2=transformations.compose_matrix(translate=origin+position)
+		RT=transformations.concatenate_matrices(T2,R,T1)		
+		M=actor.GetMatrix()
+		RT2=numpy.empty((4,4))
+		for i in range(4):
+		    for j in range(4):
+			RT2[i,j]=M.GetElement(i,j)
+		assert(numpy.linalg.norm(RT-RT2)<1e-6)# If fail maybe because i am not using the matrix actor.GetUserMatrix()    		
+		return RT
+	    
+	    def setVtkTransform(actor,RT):
+		orientation=numpy.array(transformations.euler_from_matrix(RT))*180/numpy.pi
+		origin	=numpy.array(actor.GetOrigin())			
+		position=RT[:3,3]-(RT[:3,:3].dot(-origin)+origin)	
+		actor.SetPosition(position[0],position[1],position[2])
+		actor.SetOrientation(orientation[0],orientation[1],orientation[2])
+		
+		#M=actor.GetMatrix()
+		#for i in range(4):
+		#    for j in range(4):
+		#	M.SetElement(i,j,RT[i,j])
+		#actor.SetUserMatrix(M)# not doing the right thing
+		#M2=actor.GetMatrix()
+				
+	    
+	    sourceRotationCenter=numpy.array(self.pointClouds[1]['assemblyActor'].GetOrigin())
+	       	   
+	    
+	  
+	    import cv2		 
 	    import scipy
 	    from scipy import spatial
-	    kdtree=scipy.spatial.KDTree(pointsTargetCentered)
+	    kdtree=scipy.spatial.KDTree(pointsTarget)
 	    
-	    angles=self.pointClouds[1]['assemblyActor'].GetOrientation()  
-	    translationRefined=self.pointClouds[1]['assemblyActor'].GetPosition()
-	    
-	    # 
-	    # selfq.pointClouds[1]['assemblyActor'].GetCenter()
-	    
-	    translationAlignBary= (OriginTarget-OriginSource).flatten()	 
-	    translation=translationRefined-translationAlignBary  
+	    flann_params = dict(algorithm=1, trees=4)
+	    flann = cv2.flann_Index(pointsTarget, flann_params)
 	  
-	    angleZInit=angles[2]*numpy.pi/180
-	    #Iterative closests point
-	    from transformations import transformations
+	    
+	    def getParametersFromMatrix(RT,rotation_center):
+		angles=transformations.euler_from_matrix(RT)
+		assert(angles[0]==0)
+		assert(angles[1]==0)			
+		translate=RT[:3,3]-(RT[:3,:3].dot(-rotation_center)+rotation_center)
+		assert(translate[2]==0)
+		parameters=numpy.array((angles[2],translate[0],translate[1]))
+		return parameters
+	    
+	    def getMatrixFromParameters(parameters,rotation_center):
+		orientation_angles=[0,0,parameters[0]]
+		position=numpy.array((parameters[1],parameters[2],0))
+		T1=transformations.compose_matrix(translate=-rotation_center)
+		R=transformations.compose_matrix(angles=orientation_angles)
+		T2=transformations.compose_matrix(translate=rotation_center+position)
+		RT=transformations.concatenate_matrices(T2,R,T1)			
+		return RT		
+	    initalTransform=getVtkTransform(sourceActor)
+	    angle_translation=getParametersFromMatrix(initalTransform,sourceRotationCenter)
+	    
+	    #checking the two functions are consistent
+	    initalTransform2= getMatrixFromParameters(angle_translation,sourceRotationCenter)
+	    assert(numpy.linalg.norm(initalTransform2- initalTransform)<1e-6)
+	    
+	    
+	    M=getMatrixFromParameters(angle_translation,sourceRotationCenter)
+	    setVtkTransform(sourceActor,M)
+	    assert(numpy.linalg.norm(M-getVtkTransform(sourceActor))<1e-6)# checking constitency
+	    self.viewWidget.renWin.Render()	    
+	    
 	     
 	    def transfomPoints(angle_translation):
+		pointsSourceCentered=pointsSource-sourceRotationCenter
 		RT=transformations.compose_matrix(angles=[0,0,angle_translation[0]])
-		transformedPoints= (pointsSourceCentered.dot(RT[:3,:3].T)+angle_translation[1:]).astype(numpy.float32)	    
+		translation=numpy.array((angle_translation[1],angle_translation[2],0))
+		transformedPoints= (pointsSourceCentered.dot(RT[:3,:3].T)+sourceRotationCenter+translation).astype(numpy.float32)
 		return transformedPoints
 	    def residuals(angle_translation,idx):
 		tp=transfomPoints(angle_translation)
-		return (tp-pointsTargetCentered[idx.flatten()]).flatten()
+		return (tp-pointsTarget[idx.flatten()])
+	    def residualsFlat(angle_translation,idx):
+		return residuals(angle_translation,idx).flatten()
+	   
 	    def cost(angle_translation,idx):
 		transformedPoints=transfomPoints(angle_translation)
-		r=residuals(angle_translation,idx)
+		r=residualsFlat(angle_translation,idx)
 		return numpy.sum(r**2)		
 
 	    
 	    
 	    import scipy.optimize as optimize
-	    
-	    
-	    angle_translation =numpy.array([angleZInit,translation[0],translation[1],translation[2]])    
+	    transformedPoints=transfomPoints(angle_translation)
+	    idx=exactNN(transformedPoints,pointsTarget)[0] # start with exact matching insead of flann base macgin in order to avoid increase of energy when starting from previous solution
 	    print angle_translation
 	    bestcost=numpy.inf
 	    for i in range(10): 
 		# update matchings
 		transformedPoints=transfomPoints(angle_translation)
-		#if use_centered:
-		#    idx, distSquared = flann.knnSearch(transformedPoints, 1, params={})
-		#if (not(use_centered) or (distSquared.sum()> bestcost)):		
-		    #flann failed atr providing better neighbors fro some points	
-		#print "flann failed"
-		idx,distSquared=exactNN(transformedPoints,pointsTargetCentered)
+		prevDistSquared=(residuals(angle_translation,idx)**2).sum(axis=1)
+		idx, distSquared = flann.knnSearch(transformedPoints, 1, params={})
+		idx=idx.flatten()
+		# detect points where flann failed at providing a better match and perform brute force search for these points
+		wrongIds=numpy.nonzero(prevDistSquared<distSquared.flatten())[0]
+		if len(wrongIds)>0:
+		    idx[wrongIds]=exactNN(transformedPoints[wrongIds],pointsTarget)[0]
 		#idx=numpy.array(kdtree.query(transformedPoints)[1])# seels much slower !
 		newcost=cost(angle_translation,idx)
-		assert(bestcost>=newcost)
+		assert(bestcost>=newcost-1e-4)		
 		bestcost=newcost
 		print bestcost
 		# update rotation and translation
-		result = optimize.leastsq(residuals,angle_translation ,args=(idx),full_output=True)
+		result = optimize.leastsq(residualsFlat,angle_translation ,args=(idx),full_output=True,epsfcn=1e-4)
 		angle_translation=result[0]
 		newcost=cost(angle_translation,idx)
-		assert(bestcost>=newcost-1e-6)
+		assert(bestcost>=newcost-1e-4)
 		bestcost=newcost	
 		print bestcost
-		translationRefined=translationAlignBary +angle_translation[1:]
-		self.pointClouds[1]['assemblyActor'].SetPosition(translationRefined[0],translationRefined[1],translationRefined[2])
-		angle=angle_translation[0]
-		self.pointClouds[1]['assemblyActor'].SetOrientation(0,0,angle*180/numpy.pi)
+		
+		M=getMatrixFromParameters(angle_translation,sourceRotationCenter)
+		setVtkTransform(sourceActor,M)
 		self.viewWidget.renWin.Render()	
 	    print angle_translation
 		
@@ -1526,10 +1585,10 @@ def main():
     ex = Example()
     
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_keypoints.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_keypoints.pcd')
     
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_spinimage.pcd')
-    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene33_ascii.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene33_ascii.pcd')
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
         
     ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_keypoints.pcd')
