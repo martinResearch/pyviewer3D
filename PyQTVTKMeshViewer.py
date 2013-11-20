@@ -1182,14 +1182,37 @@ class Example(QtGui.QMainWindow):
 
 
         if obj.GetKeyCode()=='o':
+            
+            
             print 'perform ICP from the existing pose'
             from transformations import transformations
 
             pointsTarget=self.pointClouds[0]['points'].reshape(-1,3)
+            
+            #subsample to target
+            import pcl
+            
+            def subSample(points):
+                pc= pcl.PointCloud()
+                pc.from_array(points)
+                VGF= pc.make_voxel_grid_filter()
+                VGF.set_leaf_size(0.025,0.025,0.025)
+                return VGF.filter().to_array()                   
+                
+       
+            pointsTarget=subSample(pointsTarget)  
+            
+            
+            sourceActor=self.pointClouds[1]['assemblyActor']
             pointsSource=self.pointClouds[1]['points'].reshape(-1,3)
+              
+            pointsSource=subSample(pointsSource)            
+            #self.viewWidget.plotPoints( pointsTarget)
+            
+           
            
 
-            sourceActor=self.pointClouds[1]['assemblyActor']
+           
 
             def getVtkTransform(actor):
                 """checking the forumal for the VTK transfomation """
@@ -1209,12 +1232,13 @@ class Example(QtGui.QMainWindow):
                 return RT
 
             def setVtkTransform(actor,RT):
+                scale=numpy.sqrt(RT[:3,:3]**2).sum(axis=0)
                 orientation=numpy.array(transformations.euler_from_matrix(RT))*180/numpy.pi
                 origin	=numpy.array(actor.GetOrigin())			
                 position=RT[:3,3]-(RT[:3,:3].dot(-origin)+origin)	
                 actor.SetPosition(position[0],position[1],position[2])
                 actor.SetOrientation(orientation[0],orientation[1],orientation[2])
-
+                actor.SetScale(scale[0],scale[1],scale[2])
                 #M=actor.GetMatrix()
                 #for i in range(4):
                 #    for j in range(4):
@@ -1234,8 +1258,16 @@ class Example(QtGui.QMainWindow):
                 setVtkTransform(sourceActor,M)
                 self.viewWidget.renWin.Render()	
            
-            ICP(pointsSource,pointsTarget,initalTransform=initalTransform,visualizeFunc=visualizeFunc)
-
+            M,transformedPoints =ICP(pointsSource,pointsTarget,initalTransform=initalTransform,visualizeFunc=visualizeFunc,use_scaling=True)
+            self.viewWidget.plotPoints( transformedPoints )
+          
+            
+            from IterativeClosestPoint import IterativeClosestPointPCL as ICP_PCL
+            M2,pc_1aligned=ICP_PCL(pointsSource,pointsTarget)
+            aligned=pc_1aligned.to_array()
+            
+            #self.viewWidget.plotPoints(aligned)
+            #setVtkTransform(sourceActor,M2)
             self.viewWidget.renWin.Render()
             #RT=transformations.compose_matrix(angles=[0,0,angle], translate=translation)
 
@@ -1493,14 +1525,15 @@ def main():
     ex = Example()
 
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_with_normals.pcd')
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_keypoints.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_keypoints.pcd')
 
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/model_spinimage.pcd')
-    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene33_ascii.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene33_ascii.pcd')
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home/models/scene31_m2.pcd')
 
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_keypoints.pcd')
-    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_spinimage.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_keypoints.pcd')
+    #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/scene_spinimage.pcd')
+    ex.openFile('/media/truecrypt1/scene_labelling_rgbd/object_detection/build/simple_chair.pcd')
     #ex.openFile('/media/truecrypt1/scene_labelling_rgbd/data/home_data_ascii/scene18_ascii_camera_centers.ptx')
 
 
